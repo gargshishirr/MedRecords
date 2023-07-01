@@ -1,6 +1,7 @@
 import React from 'react'
 import './App.css' 
-import SideBar from './components/SideBar Section/SideBar'
+import Sidebar from './components/SideBar Section/SideBar'
+import Body from './components/Body Section/Body'
 const App=()=>{
     return (
        <div className='container'>

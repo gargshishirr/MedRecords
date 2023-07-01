@@ -1,9 +1,9 @@
 import React from 'react'
-import '. Body.css'
+import './Body.css'
 
 const Body = () => {
   return (
-    <div Body </div>
+    <div> Body </div>
   )
 }
 
