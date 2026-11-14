@@ -119,7 +119,7 @@ Then open the URL Vite prints (usually http://localhost:5173). The demo data is 
 
 ## Deployment
 
-Pushing to `main` runs `.github/workflows/deploy.yml`, which lints, tests, builds and publishes `dist/` to GitHub Pages. Enable it once under **Settings → Pages → Source: GitHub Actions**.
+Pushing to `main` runs `.github/workflows/deploy.yml`, which lints, tests and builds the app, then publishes `dist/` to the `gh-pages` branch. GitHub Pages serves that branch (**Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**).
 
 ## Privacy
 
