@@ -1,0 +1,48 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  outline: none;
+}
+
+.page {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--s-6) var(--s-7) var(--s-9);
+}
+
+@media (max-width: 1023px) {
+  .page {
+    padding: var(--s-5) var(--s-5) var(--s-8);
+  }
+}
+
+@media (max-width: 767px) {
+  .page {
+    padding: var(--s-4) var(--s-4) calc(var(--bottomnav-h) + var(--s-6) + env(safe-area-inset-bottom));
+  }
+}
+
+@media print {
+  .shell {
+    display: block;
+  }
+
+  .page {
+    padding: 0;
+    max-width: none;
+  }
+}
