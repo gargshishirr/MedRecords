@@ -39,6 +39,18 @@ describe('loadData', () => {
   });
 });
 
+describe('demo seed', () => {
+  it('uses only non-dialable placeholder phone numbers', () => {
+    const data = createSeedData(now);
+    const phones = data.profiles.flatMap((p) => [...p.emergencyContacts.map((c) => c.phone), p.primaryDoctor.phone]);
+    expect(phones.length).toBeGreaterThan(0);
+    for (const phone of phones) expect(phone).toMatch(/^\+91 00000 \d{5}$/);
+    // No other +91 numbers anywhere in the dataset (e.g. summaries or notes).
+    const all = JSON.stringify(data).match(/\+91[\d ]+/g) ?? [];
+    expect(all.every((n) => /^\+91 00000 \d{5}$/.test(n))).toBe(true);
+  });
+});
+
 describe('addRecord', () => {
   it('prepends a trimmed record for the profile and logs activity', () => {
     const data = createSeedData(now);

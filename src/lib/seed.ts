@@ -18,7 +18,7 @@ import { RECORD_TYPE_META } from './recordMeta';
 import { LAB_TESTS } from './ranges';
 import { dosesForDay } from './meds';
 
-/* All people, clinicians, facilities and phone numbers below are fictional. */
+/* All people, clinicians and facilities below are fictional. Phone numbers are non-dialable placeholders (+91 00000 …). */
 
 const FACILITY = {
   lotus: 'Lotus Family Clinic, Baner',
@@ -147,10 +147,10 @@ export function createSeedData(now: Date = new Date()): AppData {
         { name: 'Vitamin D deficiency', since: ago(16), status: 'managed' },
       ],
       emergencyContacts: [
-        { name: 'Arjun Kapoor', relation: 'Husband', phone: '+91 98765 01234' },
-        { name: 'Meera Kapoor', relation: 'Mother', phone: '+91 98765 04321' },
+        { name: 'Arjun Kapoor', relation: 'Husband', phone: '+91 00000 01234' },
+        { name: 'Meera Kapoor', relation: 'Mother', phone: '+91 00000 04321' },
       ],
-      primaryDoctor: { name: DOCTOR.rao, specialty: 'General Physician', facility: FACILITY.lotus, phone: '+91 20 4000 1001' },
+      primaryDoctor: { name: DOCTOR.rao, specialty: 'General Physician', facility: FACILITY.lotus, phone: '+91 00000 10001' },
     },
     {
       id: 'meera',
@@ -171,14 +171,14 @@ export function createSeedData(now: Date = new Date()): AppData {
         { name: 'Hypothyroidism', since: ago(14), status: 'managed' },
       ],
       emergencyContacts: [
-        { name: 'Riya Kapoor', relation: 'Daughter', phone: '+91 98765 01111' },
-        { name: 'Sanjay Kapoor', relation: 'Husband', phone: '+91 98765 02222' },
+        { name: 'Riya Kapoor', relation: 'Daughter', phone: '+91 00000 01111' },
+        { name: 'Sanjay Kapoor', relation: 'Husband', phone: '+91 00000 02222' },
       ],
       primaryDoctor: {
         name: DOCTOR.menon,
         specialty: 'Endocrinologist',
         facility: FACILITY.ashoka,
-        phone: '+91 20 4000 2002',
+        phone: '+91 00000 20002',
       },
     },
     {
@@ -193,14 +193,14 @@ export function createSeedData(now: Date = new Date()): AppData {
       allergies: [{ name: 'Peanuts', severity: 'severe', reaction: 'Hives, wheezing' }],
       conditions: [{ name: 'Mild eczema', since: yearsAgo(3), status: 'managed' }],
       emergencyContacts: [
-        { name: 'Riya Kapoor', relation: 'Mother', phone: '+91 98765 01111' },
-        { name: 'Arjun Kapoor', relation: 'Father', phone: '+91 98765 01234' },
+        { name: 'Riya Kapoor', relation: 'Mother', phone: '+91 00000 01111' },
+        { name: 'Arjun Kapoor', relation: 'Father', phone: '+91 00000 01234' },
       ],
       primaryDoctor: {
         name: DOCTOR.siddiqui,
         specialty: 'Paediatrician',
         facility: FACILITY.littleSteps,
-        phone: '+91 20 4000 3003',
+        phone: '+91 00000 30003',
       },
     },
   ];
