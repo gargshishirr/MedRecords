@@ -1,0 +1,191 @@
+/*
+ * Design tokens. Every colour pair used for text has been chosen to meet
+ * WCAG AA (4.5:1) in both themes.
+ */
+:root {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* 8px spacing grid (with 4px half-step) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 40px;
+  --s-8: 48px;
+  --s-9: 64px;
+
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-md: 0.875rem; /* 14 */
+  --text-base: 0.9375rem; /* 15 */
+  --text-lg: 1.0625rem; /* 17 */
+  --text-xl: 1.375rem; /* 22 */
+  --text-2xl: 1.75rem; /* 28 */
+  --text-3xl: 2.125rem; /* 34 */
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 420ms;
+
+  --sidebar-w: 256px;
+  --topbar-h: 64px;
+  --bottomnav-h: 64px;
+  --content-max: 1240px;
+}
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f6f4ef;
+  --bg-sidebar: #fbfaf7;
+  --surface: #ffffff;
+  --surface-muted: #f8f6f2;
+  --surface-hover: #f2efe9;
+  --surface-inset: #f1eee8;
+  --border: #e6e1d7;
+  --border-soft: #eeeae3;
+  --border-strong: #d3ccbf;
+
+  --text: #15212b;
+  --text-muted: #4b5663;
+  --text-subtle: #626c78;
+  --text-inverse: #ffffff;
+
+  --primary: #0e6b66;
+  --primary-strong: #0a524e;
+  --primary-soft: #e2f0ee;
+  --primary-soft-text: #0b5753;
+  --on-primary: #ffffff;
+  --primary-gradient: linear-gradient(135deg, #147a73 0%, #0b4a47 100%);
+
+  --accent: #e0613f;
+  --accent-text: #b4401f;
+  --accent-soft: #fce9e2;
+
+  --ok: #2f8a5f;
+  --ok-fg: #1d6b47;
+  --ok-bg: #e3f2ea;
+  --watch: #d99a1e;
+  --watch-fg: #8a5200;
+  --watch-bg: #fcf0d6;
+  --high: #e0613f;
+  --high-fg: #b23a1e;
+  --high-bg: #fce6df;
+  --info-fg: #2b5e8c;
+  --info-bg: #e6eff8;
+
+  --cat-visit: #2a5f8f;
+  --cat-visit-bg: #e5eef7;
+  --cat-lab: #5b45b0;
+  --cat-lab-bg: #eeeafa;
+  --cat-prescription: #2d6e47;
+  --cat-prescription-bg: #e4f2e9;
+  --cat-imaging: #8a5a12;
+  --cat-imaging-bg: #f8eedc;
+  --cat-vaccination: #a23562;
+  --cat-vaccination-bg: #fae6ee;
+  --cat-document: #4e5966;
+  --cat-document-bg: #eceef1;
+
+  --chart-line: #0e6b66;
+  --chart-line-2: #7aa9a5;
+  --chart-band: rgba(47, 138, 95, 0.1);
+  --chart-band-edge: rgba(47, 138, 95, 0.35);
+  --chart-grid: #ece8e0;
+
+  --shadow-xs: 0 1px 2px rgba(21, 33, 43, 0.05);
+  --shadow-sm: 0 1px 2px rgba(21, 33, 43, 0.04), 0 2px 8px -2px rgba(21, 33, 43, 0.06);
+  --shadow-md: 0 2px 4px rgba(21, 33, 43, 0.04), 0 12px 28px -8px rgba(21, 33, 43, 0.12);
+  --shadow-lg: 0 4px 12px rgba(21, 33, 43, 0.06), 0 28px 64px -16px rgba(21, 33, 43, 0.24);
+  --backdrop: rgba(21, 33, 43, 0.36);
+  --focus: #0e6b66;
+
+  /* Avatar tint: saturation + lightness, combined with a per-profile hue */
+  --avatar-bg: 48% 89%;
+  --avatar-fg: 55% 24%;
+  --avatar-ring: 40% 80%;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0d1417;
+  --bg-sidebar: #10181b;
+  --surface: #141d21;
+  --surface-muted: #182227;
+  --surface-hover: #1d292f;
+  --surface-inset: #111a1e;
+  --border: #253339;
+  --border-soft: #1f2b31;
+  --border-strong: #34454d;
+
+  --text: #e7edef;
+  --text-muted: #a9b5bb;
+  --text-subtle: #8a98a1;
+  --text-inverse: #0d1417;
+
+  --primary: #4fc1b6;
+  --primary-strong: #74d4ca;
+  --primary-soft: #16312f;
+  --primary-soft-text: #86ddd3;
+  --on-primary: #04211f;
+  --primary-gradient: linear-gradient(135deg, #1b6e68 0%, #0e3f3c 100%);
+
+  --accent: #f08463;
+  --accent-text: #f59a7e;
+  --accent-soft: #34201a;
+
+  --ok: #5cc28c;
+  --ok-fg: #7ed8a8;
+  --ok-bg: #15302a;
+  --watch: #e7b04a;
+  --watch-fg: #f2c46b;
+  --watch-bg: #33291a;
+  --high: #f08463;
+  --high-fg: #f89c86;
+  --high-bg: #36211d;
+  --info-fg: #93bfe9;
+  --info-bg: #182a3a;
+
+  --cat-visit: #93bde9;
+  --cat-visit-bg: #1a2a3a;
+  --cat-lab: #bbaaf3;
+  --cat-lab-bg: #251f3b;
+  --cat-prescription: #8ad3a7;
+  --cat-prescription-bg: #16302a;
+  --cat-imaging: #e9c283;
+  --cat-imaging-bg: #33291a;
+  --cat-vaccination: #f2a2c4;
+  --cat-vaccination-bg: #3a1e2b;
+  --cat-document: #b1bcc7;
+  --cat-document-bg: #222b33;
+
+  --chart-line: #4fc1b6;
+  --chart-line-2: #2f6f69;
+  --chart-band: rgba(92, 194, 140, 0.1);
+  --chart-band-edge: rgba(92, 194, 140, 0.35);
+  --chart-grid: #1f2a30;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 16px 32px -12px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.35), 0 32px 64px -16px rgba(0, 0, 0, 0.7);
+  --backdrop: rgba(3, 8, 10, 0.6);
+  --focus: #74d4ca;
+
+  --avatar-bg: 32% 22%;
+  --avatar-fg: 70% 84%;
+  --avatar-ring: 30% 30%;
+}

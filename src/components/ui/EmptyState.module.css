@@ -1,0 +1,49 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--s-7) var(--s-5);
+  gap: var(--s-1);
+}
+
+.empty[data-compact] {
+  padding: var(--s-4) var(--s-3);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--s-2);
+  border-radius: var(--r-md);
+  background: var(--surface-inset);
+  color: var(--text-subtle);
+  border: 1px dashed var(--border-strong);
+}
+
+.empty[data-compact] .icon {
+  width: 36px;
+  height: 36px;
+}
+
+.icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.title {
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+
+.text {
+  max-width: 34ch;
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+}
+
+.action {
+  margin-top: var(--s-3);
+}

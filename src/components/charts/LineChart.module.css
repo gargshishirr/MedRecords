@@ -1,0 +1,188 @@
+.wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.svg {
+  display: block;
+  overflow: visible;
+  font-family: var(--font-sans);
+}
+
+.grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.axis {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.yLabel {
+  fill: var(--text-subtle);
+  font-size: 12px;
+  text-anchor: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.xLabel {
+  fill: var(--text-subtle);
+  font-size: 12px;
+  text-anchor: middle;
+}
+
+.unitLabel {
+  fill: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.band {
+  fill: var(--chart-band);
+}
+
+.bandEdge {
+  stroke: var(--chart-band-edge);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.bandLabel {
+  fill: var(--ok-fg);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.line {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.guide {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.point {
+  cursor: pointer;
+  outline: none;
+}
+
+.hit {
+  fill: transparent;
+}
+
+.dot {
+  fill: var(--surface);
+  stroke: var(--chart-line);
+  stroke-width: 2.25;
+  transition: r var(--dur-fast) var(--ease-out);
+}
+
+.point[data-status='watch'] .dot {
+  fill: var(--watch);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.point[data-status='high'] .dot,
+.point[data-status='low'] .dot {
+  fill: var(--high);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.halo {
+  fill: color-mix(in srgb, var(--chart-line) 14%, transparent);
+  stroke: var(--focus);
+  stroke-width: 2;
+}
+
+.point[data-status='high'] .halo,
+.point[data-status='low'] .halo {
+  fill: color-mix(in srgb, var(--high) 16%, transparent);
+}
+
+.point[data-status='watch'] .halo {
+  fill: color-mix(in srgb, var(--watch) 18%, transparent);
+}
+
+.point:not(:focus-visible) .halo {
+  stroke: transparent;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  min-width: 132px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--text);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 16px));
+  animation: tip-in var(--dur) var(--ease-out);
+  white-space: nowrap;
+}
+
+.tooltip[data-flip] {
+  transform: translate(calc(-100% + 24px), calc(-100% - 16px));
+}
+
+.tooltip[data-flip-start] {
+  transform: translate(-24px, calc(-100% - 16px));
+}
+
+.ttDate {
+  font-size: var(--text-xs);
+  opacity: 0.8;
+}
+
+.ttValue strong {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.ttStatus {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  font-size: 11px;
+  font-weight: 700;
+  background: #e3f2ea;
+  color: #1d6b47;
+}
+
+.ttStatus[data-status='watch'] {
+  background: #fcf0d6;
+  color: #8a5200;
+}
+
+.ttStatus[data-status='high'],
+.ttStatus[data-status='low'] {
+  background: #fce6df;
+  color: #b23a1e;
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
