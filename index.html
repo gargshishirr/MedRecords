@@ -4,21 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="MedRecords — your family's health, in one calm place. A privacy-first personal health record hub with demo data stored only in your browser." />
+    <meta name="description" content="MedRecords — your family's health, in one calm place. A private health record hub that keeps everything in your browser, with an optional passcode lock." />
+    <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0E1518" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
     <title>MedRecords — your family's health, in one calm place</title>
-    <script>
-      // Apply the saved theme before first paint to avoid a flash.
-      (function () {
-        try {
-          var pref = localStorage.getItem('medrecords:theme') || 'system';
-          var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Theme before first paint + frame guard. A file, not inline, so the CSP can block all inline scripts. -->
+    <script src="./theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>

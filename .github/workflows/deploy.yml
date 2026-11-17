@@ -37,6 +37,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check the Content-Security-Policy is in the build
+        run: grep -q 'http-equiv="Content-Security-Policy"' dist/index.html
+
       # Pages serves the gh-pages branch, so publish dist/ there as a single commit.
       - name: Publish to gh-pages
         env:

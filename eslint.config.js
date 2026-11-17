@@ -27,4 +27,9 @@ export default tseslint.config(
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
   },
+  {
+    // Plain browser scripts copied as-is into the build.
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
 );
