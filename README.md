@@ -8,24 +8,27 @@
 
 A privacy-first personal health record hub for the whole family — visits, lab trends, medications and an emergency card — that runs entirely in your browser.
 
-**[Live demo →](https://gargshishirr.github.io/MedRecords/)**
+**[Open the app →](https://gargshishirr.github.io/MedRecords/)** · **[How to use it (guide) →](GUIDE.md)**
 
 </div>
 
 ![Overview dashboard](docs/screenshots/overview.png)
 
-> **Demo data only.** Every person, clinician, facility and phone number in the app is fictional. Data is stored only in your browser's `localStorage` — there is no backend, no account and no analytics. MedRecords is a portfolio project, not a medical device, and nothing in it is medical advice.
+> **Try the demo or use it for your family.** On the first visit you choose: explore a fictional demo family, or start fresh with your own. Everything stays in this browser on this device. There is no backend, no account and no analytics. You can lock it with a passcode to encrypt it. Every person, clinician and phone number in the demo is fictional. MedRecords is not a medical device, and nothing in it is medical advice.
 
 ## Features
 
-- **Family profiles** — switch between Riya (29), her mother Meera (58, type 2 diabetes + hypertension) and her son Kabir (6). Each profile has its own records, vitals, labs, medications, appointments, allergies, conditions, blood group and emergency contacts, with ~18 months of generated history.
-- **Overview dashboard** — vitals snapshot (blood pressure, heart rate, fasting glucose, weight/BMI, SpO₂) with sparklines and *Normal / Watch / High* status derived from age- and sex-aware reference ranges; a "today's medications" checklist that persists per day; upcoming appointments; latest lab results with out-of-range flags; allergies & conditions; recent activity.
-- **Records timeline** — visits, lab reports, prescriptions, imaging, vaccinations and documents grouped by month, with type filters, full-text search and sorting. Records open in a slide-over detail panel with lab results, notes and (placeholder) attachments. An accessible *Add record* form validates input and saves instantly.
-- **Lab trends** — hand-built SVG line charts with the reference range drawn as a shaded band, highlighted out-of-range points, hover **and keyboard** tooltips (Tab / arrow keys), latest value, change vs. previous and a toggleable data table.
-- **Medications** — active and past medicines with dose, schedule (morning / afternoon / night), prescriber and start date; a 7-day adherence ring computed from the checklist; refill countdowns that turn amber and coral as supply runs low.
-- **Emergency card** — an ID-card style summary (blood group, allergies, conditions, current medicines, emergency contacts, primary doctor) with a QR code that encodes a plain-text summary, plus a print stylesheet that prints just the card.
-- **⌘K / Ctrl+K command palette** — jump to any page, record, lab test or medication, switch profiles or toggle the theme from the keyboard.
-- **Settings** — light / dark / system theme, JSON export, validated JSON import and one-click reset of the demo data.
+- **Your family or the demo** — the first visit offers *Try the demo* (Riya, Meera and Kabir, with ~18 months of generated history) or *Start fresh*. You can switch later in Settings.
+- **Family members** — add, edit and delete people: name, birth date, sex, blood group, height, allergies, conditions, emergency contacts and primary doctor.
+- **Overview dashboard** — vitals snapshot (blood pressure, heart rate, fasting glucose, weight/BMI, SpO₂) with sparklines and *Normal / Watch / High* status from age- and sex-aware reference ranges; add readings; a daily medication checklist; upcoming appointments you can add, edit and delete; latest lab results; allergies & conditions; recent activity.
+- **Records timeline** — visits, lab reports, prescriptions, imaging, vaccinations and documents grouped by month, with type filters, search and sorting. Add, edit and delete records with an accessible, validated form.
+- **Lab trends** — hand-built SVG line charts with the reference range as a shaded band, out-of-range points, hover **and keyboard** tooltips and a data table. Add, edit and delete results.
+- **Medications** — active and past medicines with dose, schedule and prescriber; a 7-day adherence ring from the checklist; refill countdowns. Add, edit and delete medicines.
+- **Emergency card** — an ID-card style summary with a QR code that holds plain text only. You choose whether it shows the date of birth, conditions, medicines and doctor. A print stylesheet prints just the card.
+- **Passcode lock (optional)** — encrypts all health data in the browser with AES-GCM and a key from your passcode (PBKDF2-SHA-256, 600,000 iterations). Auto-locks after inactivity, locks every open tab, and slows down wrong guesses.
+- **Backups** — export an encrypted (passcode) or plain JSON backup; import either. Imports are size-limited and strictly validated.
+- **⌘K / Ctrl+K command palette** — jump to any page, record, lab test or medicine, add things, switch people, toggle the theme or lock the app.
+- **Settings** — family members, the lock, backups, start fresh, demo data and a light / dark / system theme.
 
 ## Screenshots
 
@@ -37,11 +40,21 @@ A privacy-first personal health record hub for the whole family — visits, lab 
 | **Lab trends** — reference band, flagged points, keyboard tooltips | **Medications** — adherence ring, checklist and refills |
 | ![Emergency card](docs/screenshots/emergency-card.png) | ![Dark theme](docs/screenshots/dark-overview.png) |
 | **Emergency card** — printable, with QR summary | **Dark theme** — full token-based theme |
+| ![First visit](docs/screenshots/welcome.png) | ![Lock screen](docs/screenshots/lock-screen.png) |
+| **First visit** — try the demo or start fresh | **Lock screen** — data stays encrypted until you unlock |
 
 <p align="center">
   <img src="docs/screenshots/mobile-overview.png" width="320" alt="Mobile overview with bottom tab bar" />
   <br /><em>Mobile layout with a bottom tab bar (360 px and up)</em>
 </p>
+
+## Security & privacy
+
+- **No servers involved.** No backend, no account, no analytics, no third-party requests. Fonts are self-hosted.
+- **Encryption at rest (optional).** WebCrypto only: PBKDF2-SHA-256 (600,000 iterations, random 16-byte salt) derives a non-extractable AES-GCM key at unlock. Every save uses a fresh 12-byte IV. Storage holds only `{ v, salt, iv, ct }` — never the passcode or key. While locked, nothing readable is in `localStorage` (the theme setting stays plain).
+- **Hardened import.** 5 MB limit, strict schema validation that rebuilds every object from a whitelist (unknown keys are dropped), `__proto__` / `constructor` / `prototype` keys are stripped, and errors are written for people.
+- **Content-Security-Policy.** Production builds get a CSP `<meta>` tag (`script-src 'self'`, no inline scripts or styles, `object-src 'none'` and more), `referrer: no-referrer`, and a frame guard because a meta CSP can't set `frame-ancestors`.
+- **No health data in URLs.** Links between pages pass ids through router state, not the address bar.
 
 ## Accessibility & design
 
@@ -60,9 +73,10 @@ A privacy-first personal health record hub for the whole family — visits, lab 
 - Hand-built **SVG charts** (sparklines, line chart with reference bands, adherence ring)
 - **lucide-react** icons, self-hosted **Inter** and **Fraunces** variable fonts via `@fontsource`
 - **qrcode** for the emergency-card QR code (lazy-loaded)
-- `localStorage` persistence with a versioned schema key (`medrecords:data:v1`) and import validation
+- `localStorage` persistence with a versioned schema key (`medrecords:data:v1`, or `medrecords:vault:v1` when locked) and strict import validation
+- **WebCrypto** (PBKDF2 + AES-GCM) for the optional passcode lock and encrypted backups
 - **Vitest** + **Testing Library** + jsdom, **ESLint** (flat config, typescript-eslint, react-hooks)
-- **GitHub Actions** → GitHub Pages deployment
+- **GitHub Actions** — CI on pull requests, then GitHub Pages deployment from `main`
 
 ## Getting started
 
@@ -75,7 +89,7 @@ npm install
 npm run dev
 ```
 
-Then open the URL Vite prints (usually http://localhost:5173). The demo data is generated on first load; use **Settings → Reset demo data** to start over.
+Then open the URL Vite prints (usually http://localhost:5173). Choose **Try the demo** or **Start fresh**. You can switch later in **Settings**.
 
 ## Scripts
 
@@ -92,24 +106,36 @@ Then open the URL Vite prints (usually http://localhost:5173). The demo data is 
 
 ```
 .
-├── .github/workflows/deploy.yml   # Build, test and deploy to GitHub Pages on push to main
+├── .github/workflows/
+│   ├── ci.yml                     # Lint, typecheck, test and build every pull request
+│   └── deploy.yml                 # Same checks, then deploy to GitHub Pages on push to main
 ├── docs/screenshots/              # README images
-├── public/favicon.svg             # SVG logo mark
+├── public/
+│   ├── favicon.svg                # SVG logo mark
+│   └── theme-init.js              # Theme before first paint + frame guard (no inline scripts)
 ├── index.html
-├── vite.config.ts                 # base: './' so assets resolve under /MedRecords/
+├── vite.config.ts                 # base: './' for GitHub Pages; build-only CSP plugin
+├── GUIDE.md                       # Short guide: use, keep safe, maintain
 └── src/
-    ├── main.tsx / App.tsx         # Entry point, providers and routes
+    ├── main.tsx / App.tsx         # Entry point, providers, welcome/lock gate and routes
     ├── styles/                    # tokens.css (light + dark design tokens), global.css
     ├── lib/                       # Framework-free logic (unit tested)
     │   ├── types.ts               # Data model
     │   ├── seed.ts                # Deterministic fictional demo data (~18 months)
-    │   ├── store.ts               # localStorage persistence, import validation, pure updates
+    │   ├── store.ts               # Storage keys and pure add/edit/delete updates
+    │   ├── validate.ts            # Strict schema validation for stored data and imports
+    │   ├── crypto.ts              # PBKDF2 + AES-GCM encryption (WebCrypto)
+    │   ├── backup.ts              # Plain and encrypted backup files
+    │   ├── throttle.ts            # Growing delays after wrong passcodes
+    │   ├── forms.ts, recordForm.ts # Form validation
     │   ├── ranges.ts              # Reference ranges + normal/watch/high/low classification
     │   ├── meds.ts                # Dose schedule, adherence and refill calculations
-    │   ├── recordForm.ts          # Add-record validation
     │   └── date.ts, format.ts, selectors.ts, hooks.ts
-    ├── state/                     # React context: data store, theme, toasts
+    ├── state/                     # React context: data store + lock, theme, toasts, idle timer
     ├── components/
+    │   ├── gate/                  # Welcome screen and lock screen
+    │   ├── family/                # Add/edit family member form and dialog
+    │   ├── forms/                 # Shared form pieces (errors, passcode input, actions)
     │   ├── shell/                 # App shell: sidebar, top bar, bottom nav, profile switcher
     │   ├── charts/                # Sparkline, LineChart, Ring (pure SVG)
     │   ├── ui/                    # Button, Card, Dialog, Field, Pill, Avatar, EmptyState
@@ -119,11 +145,15 @@ Then open the URL Vite prints (usually http://localhost:5173). The demo data is 
 
 ## Deployment
 
-Pushing to `main` runs `.github/workflows/deploy.yml`, which lints, tests and builds the app, then publishes `dist/` to the `gh-pages` branch. GitHub Pages serves that branch (**Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**).
+Pull requests (and pushes to other branches) run `.github/workflows/ci.yml`: lint, typecheck, test and build.
+
+Pushing to `main` runs `.github/workflows/deploy.yml`, which lints, tests and builds the app, then publishes `dist/` to the `gh-pages` branch. GitHub Pages serves that branch (**Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**). So merging a pull request into `main` makes it live.
 
 ## Privacy
 
-MedRecords never sends data anywhere. Everything — including records you add — lives in your browser's `localStorage` under `medrecords:data:v1` and can be exported, imported or wiped from Settings. Clearing site data removes it completely.
+MedRecords never sends data anywhere. Everything lives in this browser's `localStorage`: under `medrecords:data:v1`, or encrypted under `medrecords:vault:v1` when a passcode is set. You can export, import or wipe it from Settings. Clearing the site's data in the browser deletes it completely, so export backups regularly.
+
+If you forget the passcode, the data cannot be recovered. Keep a backup.
 
 ---
 
