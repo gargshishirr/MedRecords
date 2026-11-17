@@ -204,12 +204,12 @@ export function bmiRange(p: PersonContext): RefRange {
   return isChild(p) ? { low: 13.5, high: 17.5, watchLow: 12.5, watchHigh: 19 } : { low: 18.5, high: 24.9, watchLow: 17, watchHigh: 29.9 };
 }
 
-/** Status of a single vital reading for a given person. Weight is judged via BMI. */
+/** Status of a single vital reading for a given person. Weight is judged via BMI, so it has no status without a height. */
 export function vitalStatus(
   kind: VitalKind,
   reading: { value: number; value2?: number },
-  p: PersonContext & { heightCm: number },
-): RangeStatus {
+  p: PersonContext & { heightCm?: number },
+): RangeStatus | null {
   switch (kind) {
     case 'bp':
       return bpStatus(reading.value, reading.value2 ?? 0, p);
@@ -218,7 +218,7 @@ export function vitalStatus(
     case 'glucose':
       return classify(reading.value, GLUCOSE_RANGE);
     case 'weight':
-      return classify(bmi(reading.value, p.heightCm), bmiRange(p));
+      return p.heightCm ? classify(bmi(reading.value, p.heightCm), bmiRange(p)) : null;
     case 'spo2':
       return classify(reading.value, SPO2_RANGE);
   }
@@ -227,7 +227,7 @@ export function vitalStatus(
 /** Short reference label shown under each vital's name. Weight shows the reading's BMI. */
 export function vitalRangeLabel(
   kind: VitalKind,
-  p: PersonContext & { heightCm: number },
+  p: PersonContext & { heightCm?: number },
   reading?: { value: number },
 ): string {
   switch (kind) {
@@ -244,6 +244,7 @@ export function vitalRangeLabel(
       return `Range ${GLUCOSE_RANGE.low}–${GLUCOSE_RANGE.high}`;
     case 'weight': {
       const r = bmiRange(p);
+      if (!p.heightCm) return 'Add a height to see BMI';
       return reading ? `BMI ${bmi(reading.value, p.heightCm).toFixed(1)} · ${r.low}–${r.high}` : `BMI ${r.low}–${r.high}`;
     }
     case 'spo2':

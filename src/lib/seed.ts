@@ -13,6 +13,7 @@ import type {
   VitalKind,
   VitalReading,
 } from './types';
+import { DEFAULT_AUTO_LOCK_MINUTES } from './types';
 import { addDays, addMonths, daysBetween, parseISODate, startOfDay, toISODate } from './date';
 import { RECORD_TYPE_META } from './recordMeta';
 import { LAB_TESTS } from './ranges';
@@ -464,6 +465,7 @@ export function createSeedData(now: Date = new Date()): AppData {
 
   return {
     schemaVersion: 1,
+    demo: true,
     seededAt: now.toISOString(),
     activeProfileId: 'riya',
     profiles,
@@ -474,5 +476,6 @@ export function createSeedData(now: Date = new Date()): AppData {
     appointments,
     doseLog,
     activity,
+    settings: { autoLockMinutes: DEFAULT_AUTO_LOCK_MINUTES },
   };
 }

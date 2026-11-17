@@ -1,20 +1,26 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowDownRight,
   ArrowUpRight,
   CalendarDays,
+  CalendarPlus,
   ClipboardList,
   FlaskConical,
   History,
   IdCard,
   Minus,
+  Pencil,
   Plus,
   ShieldAlert,
 } from 'lucide-react';
-import { useStore } from '../../state/store';
+import { useActiveProfile } from '../../state/store';
+import { useToast } from '../../state/toast';
+import { useProfileEditor } from '../../components/family/ProfileEditor';
 import { useDocumentTitle, PageHeader } from '../../components/PageHeader';
 import { Card } from '../../components/ui/Card';
-import { ButtonLink } from '../../components/ui/Button';
+import { Button, ButtonLink, IconButton } from '../../components/ui/Button';
+import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { StatusPill } from '../../components/ui/Pill';
 import { LAB_TESTS, isOutOfRange, labStatus, personContext } from '../../lib/ranges';
@@ -28,15 +34,18 @@ import {
   parseISODate,
   relativeDays,
   monthShort,
+  toISODate,
 } from '../../lib/date';
 import { firstName, formatSigned } from '../../lib/format';
 import { activityFor, latestLabs, upcomingAppointments } from '../../lib/selectors';
+import type { NavIntent } from '../../lib/hooks';
 import { VitalsSnapshot } from './VitalsSnapshot';
 import { TodayMeds } from './TodayMeds';
+import { AppointmentForm } from './AppointmentForm';
 import styles from './Overview.module.css';
 
 function LatestLabs() {
-  const { data, profile, now } = useStore();
+  const { data, profile, now } = useActiveProfile();
   const person = personContext(profile, now);
   const rows = latestLabs(data.labs.filter((l) => l.profileId === profile.id)).slice(0, 6);
   const flagged = rows.filter((r) => isOutOfRange(labStatus(r.latest.testId, r.latest.value, person))).length;
@@ -54,8 +63,17 @@ function LatestLabs() {
       flush
     >
       {rows.length === 0 ? (
-        <EmptyState icon={<FlaskConical />} title="No lab results yet" compact>
-          Add a lab report to start tracking trends.
+        <EmptyState
+          icon={<FlaskConical />}
+          title="No lab results yet"
+          compact
+          action={
+            <ButtonLink to="/labs" state={{ add: true } satisfies NavIntent} size="sm" icon={<Plus />}>
+              Add a lab result
+            </ButtonLink>
+          }
+        >
+          Add results to start tracking trends.
         </EmptyState>
       ) : (
         <ul role="list" className={styles.labList}>
@@ -66,7 +84,7 @@ function LatestLabs() {
             const DeltaIcon = delta === null || Math.abs(delta) < 10 ** -test.decimals ? Minus : delta > 0 ? ArrowUpRight : ArrowDownRight;
             return (
               <li key={latest.testId}>
-                <Link to={`/labs?test=${test.id}`} className={styles.labRow}>
+                <Link to="/labs" state={{ test: test.id } satisfies NavIntent} className={styles.labRow}>
                   <span className={styles.labName}>
                     <span className={styles.labTitle}>{test.name}</span>
                     <span className={styles.labDate}>{formatDate(latest.date)}</span>
@@ -96,17 +114,35 @@ function LatestLabs() {
 }
 
 function Upcoming() {
-  const { data, profile, now } = useStore();
-  const items = upcomingAppointments(data, profile.id, now).slice(0, 3);
+  const { data, profile, now, addAppointment, updateAppointment, deleteAppointment } = useActiveProfile();
+  const { notify } = useToast();
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const items = upcomingAppointments(data, profile.id, now);
+  const editing = items.find((a) => a.id === editingId) ?? null;
+  const today = toISODate(now);
+
   return (
-    <Card title="Upcoming appointments" icon={<CalendarDays />} flush>
+    <Card
+      title="Upcoming appointments"
+      icon={<CalendarDays />}
+      action={
+        <Button variant="ghost" size="sm" icon={<CalendarPlus />} onClick={() => setAdding(true)}>
+          Add
+        </Button>
+      }
+      flush
+    >
       {items.length === 0 ? (
-        <EmptyState icon={<CalendarDays />} title="No upcoming appointments" compact />
+        <EmptyState icon={<CalendarDays />} title="No upcoming appointments" compact>
+          Add check-ups and follow-ups so they show here.
+        </EmptyState>
       ) : (
         <ul role="list" className={styles.apptList}>
           {items.map((a) => {
             const d = parseISODate(a.at);
             const soon = daysBetween(now, a.at) <= 7;
+            const who = [a.doctor, a.specialty].filter(Boolean).join(' · ');
             return (
               <li key={a.id} className={styles.appt}>
                 <span className={styles.apptDate} data-soon={soon || undefined} aria-hidden="true">
@@ -115,30 +151,79 @@ function Upcoming() {
                 </span>
                 <span className={styles.apptBody}>
                   <span className={styles.apptReason}>{a.reason}</span>
-                  <span className={styles.apptMeta}>
-                    {a.doctor} · {a.specialty}
-                  </span>
+                  {who && <span className={styles.apptMeta}>{who}</span>}
                   <span className={styles.apptMeta}>
                     <span className="visually-hidden">{formatDate(a.at)}, </span>
-                    {formatTime(a.at)} · {a.facility}
+                    {[formatTime(a.at), a.facility].filter(Boolean).join(' · ')}
                   </span>
                 </span>
-                <span className={styles.apptWhen} data-soon={soon || undefined}>
-                  {relativeDays(a.at, now)}
+                <span className={styles.apptSide}>
+                  <span className={styles.apptWhen} data-soon={soon || undefined}>
+                    {relativeDays(a.at, now)}
+                  </span>
+                  <IconButton label={`Edit appointment: ${a.reason}`} onClick={() => setEditingId(a.id)}>
+                    <Pencil />
+                  </IconButton>
                 </span>
               </li>
             );
           })}
         </ul>
       )}
+
+      <Dialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add an appointment"
+        description={`For ${firstName(profile.name)}. It shows here until the day has passed.`}
+      >
+        <AppointmentForm
+          today={today}
+          onCancel={() => setAdding(false)}
+          onSubmit={(input) => {
+            addAppointment(input);
+            setAdding(false);
+            notify('Appointment added');
+          }}
+        />
+      </Dialog>
+      <Dialog open={editing !== null} onClose={() => setEditingId(null)} title="Edit appointment">
+        {editing && (
+          <AppointmentForm
+            key={editing.id}
+            initial={editing}
+            today={today}
+            onCancel={() => setEditingId(null)}
+            onSubmit={(input) => {
+              updateAppointment(editing.id, input);
+              setEditingId(null);
+              notify('Appointment saved');
+            }}
+            onDelete={() => {
+              deleteAppointment(editing.id);
+              setEditingId(null);
+              notify('Appointment deleted');
+            }}
+          />
+        )}
+      </Dialog>
     </Card>
   );
 }
 
 function AllergiesConditions() {
-  const { profile } = useStore();
+  const { profile } = useActiveProfile();
+  const { openEdit } = useProfileEditor();
   return (
-    <Card title="Allergies & conditions" icon={<ShieldAlert />}>
+    <Card
+      title="Allergies & conditions"
+      icon={<ShieldAlert />}
+      action={
+        <Button variant="ghost" size="sm" icon={<Pencil />} onClick={() => openEdit(profile.id)}>
+          Edit
+        </Button>
+      }
+    >
       <div className={styles.chipGroups}>
         <div>
           <h3 className={styles.chipHeading}>Allergies</h3>
@@ -184,7 +269,7 @@ function activityTime(at: string, now: Date): string {
 }
 
 function RecentActivity() {
-  const { data, profile, now } = useStore();
+  const { data, profile, now } = useActiveProfile();
   const items = activityFor(data, profile.id, 5);
   return (
     <Card title="Recent activity" icon={<History />}>
@@ -208,7 +293,7 @@ function RecentActivity() {
 }
 
 export function OverviewPage() {
-  const { data, profile, now } = useStore();
+  const { data, profile, now } = useActiveProfile();
   useDocumentTitle('Overview');
   const owner = data.profiles.find((p) => p.relation === 'Self') ?? profile;
   const isOwner = owner.id === profile.id;
@@ -221,14 +306,14 @@ export function OverviewPage() {
         description={
           isOwner
             ? "Here's your health at a glance."
-            : `You're viewing ${firstName(profile.name)}'s profile — ${profile.relation.toLowerCase()}, ${ageInYears(profile.dob, now)} years.`
+            : `You're viewing ${firstName(profile.name)}'s profile — ${[profile.relation.toLowerCase(), `${ageInYears(profile.dob, now)} years`].filter(Boolean).join(', ')}.`
         }
         actions={
           <>
             <ButtonLink to="/emergency" icon={<IdCard />}>
               Emergency card
             </ButtonLink>
-            <ButtonLink to="/records?new=1" variant="primary" icon={<Plus />}>
+            <ButtonLink to="/records" state={{ add: true } satisfies NavIntent} variant="primary" icon={<Plus />}>
               Add record
             </ButtonLink>
           </>
@@ -251,7 +336,9 @@ export function OverviewPage() {
 
       <p className={styles.footnote}>
         <ClipboardList size={14} aria-hidden="true" />
-        All people, clinicians and facilities in this demo are fictional. Not medical advice.
+        {data.demo
+          ? 'All people, clinicians and facilities in this demo are fictional. Not medical advice.'
+          : 'Stored only in this browser. Not medical advice: talk to your doctor about your results.'}
       </p>
     </>
   );

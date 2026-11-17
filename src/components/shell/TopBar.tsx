@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Moon, Plus, Search, Sun } from 'lucide-react';
 import { useTheme } from '../../state/theme';
+import { useStore } from '../../state/store';
+import type { NavIntent } from '../../lib/hooks';
 import { ButtonLink, IconButton } from '../ui/Button';
 import { LogoMark } from '../Logo';
 import { DemoBadge } from './DemoBadge';
@@ -11,6 +13,7 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigat
 
 export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const { resolved, toggle } = useTheme();
+  const { profile } = useStore();
   const nextTheme = resolved === 'dark' ? 'light' : 'dark';
 
   return (
@@ -34,9 +37,18 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
         <IconButton label="Search" className={styles.mobileSearch} onClick={onOpenPalette}>
           <Search />
         </IconButton>
-        <ButtonLink to="/records?new=1" variant="primary" size="sm" icon={<Plus />} className={styles.newRecord}>
-          New record
-        </ButtonLink>
+        {profile && (
+          <ButtonLink
+            to="/records"
+            state={{ add: true } satisfies NavIntent}
+            variant="primary"
+            size="sm"
+            icon={<Plus />}
+            className={styles.newRecord}
+          >
+            New record
+          </ButtonLink>
+        )}
         <IconButton label={`Switch to ${nextTheme} theme`} variant="outline" onClick={toggle} className={styles.theme}>
           {resolved === 'dark' ? <Sun /> : <Moon />}
         </IconButton>

@@ -5,8 +5,11 @@ import '@fontsource-variable/fraunces';
 import './styles/global.css';
 import App from './App';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// Never run inside a frame (see public/theme-init.js).
+if (window.top === window.self) {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}

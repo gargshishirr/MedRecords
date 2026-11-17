@@ -1,11 +1,13 @@
-import { Check, Moon, Pill, Sun, Sunrise } from 'lucide-react';
+import { Check, Moon, Pill, Plus, Sun, Sunrise } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { DoseSlot } from '../../lib/types';
 import { DOSE_SLOTS } from '../../lib/types';
 import { SLOT_LABEL, dosesForDay } from '../../lib/meds';
 import { toISODate } from '../../lib/date';
 import { medicationsFor } from '../../lib/selectors';
-import { useStore } from '../../state/store';
+import { doseLogFor } from '../../lib/store';
+import type { NavIntent } from '../../lib/hooks';
+import { useActiveProfile } from '../../state/store';
 import { Card } from '../../components/ui/Card';
 import { ButtonLink } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -14,11 +16,11 @@ import styles from './TodayMeds.module.css';
 export const SLOT_ICONS: Record<DoseSlot, LucideIcon> = { morning: Sunrise, afternoon: Sun, night: Moon };
 
 export function TodayMeds({ showLink = true }: { showLink?: boolean }) {
-  const { data, profile, now, toggleDose } = useStore();
+  const { data, profile, now, toggleDose } = useActiveProfile();
   const today = toISODate(now);
   const { active } = medicationsFor(data, profile.id, now);
   const doses = dosesForDay(active, today);
-  const taken = new Set(data.doseLog[profile.id]?.[today] ?? []);
+  const taken = new Set(doseLogFor(data, profile.id)?.[today] ?? []);
   const takenCount = doses.filter((d) => taken.has(d.key)).length;
   const pct = doses.length ? Math.round((takenCount / doses.length) * 100) : 0;
 
@@ -36,7 +38,18 @@ export function TodayMeds({ showLink = true }: { showLink?: boolean }) {
       }
     >
       {doses.length === 0 ? (
-        <EmptyState icon={<Pill />} title="Nothing scheduled today" compact>
+        <EmptyState
+          icon={<Pill />}
+          title="Nothing scheduled today"
+          compact
+          action={
+            showLink && (
+              <ButtonLink to="/medications" state={{ add: true } satisfies NavIntent} size="sm" icon={<Plus />}>
+                Add a medication
+              </ButtonLink>
+            )
+          }
+        >
           Active medications with a daily schedule will show up here as a checklist.
         </EmptyState>
       ) : (
@@ -66,7 +79,7 @@ export function TodayMeds({ showLink = true }: { showLink?: boolean }) {
                   <ul role="list" className={styles.doses}>
                     {items.map((d) => {
                       const isTaken = taken.has(d.key);
-                      const label = `${d.med.name} ${d.med.strength} (${SLOT_LABEL[slot].toLowerCase()})`;
+                      const label = `${[d.med.name, d.med.strength].filter(Boolean).join(' ')} (${SLOT_LABEL[slot].toLowerCase()})`;
                       return (
                         <li key={d.key}>
                           <label className={styles.dose} data-taken={isTaken || undefined}>
@@ -84,7 +97,7 @@ export function TodayMeds({ showLink = true }: { showLink?: boolean }) {
                                 {d.med.name} <span className={styles.strength}>{d.med.strength}</span>
                               </span>
                               <span className={styles.doseMeta}>
-                                {d.med.dose} · {d.med.frequency}
+                                {[d.med.dose, d.med.frequency].filter(Boolean).join(' · ') || 'No dose noted'}
                               </span>
                             </span>
                             <span className={styles.status} aria-hidden="true">

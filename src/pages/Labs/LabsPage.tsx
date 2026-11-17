@@ -1,21 +1,27 @@
 import { useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, FlaskConical, Info, Minus, Table2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowDownRight, ArrowUpRight, FlaskConical, Info, Minus, Pencil, Plus, Table2 } from 'lucide-react';
 import type { LabTestId } from '../../lib/types';
+import { LAB_TEST_IDS } from '../../lib/types';
 import { LAB_TESTS, classify, formatRange, isOutOfRange, personContext } from '../../lib/ranges';
 import type { RefRange } from '../../lib/ranges';
-import { formatDate, formatDayMonth, relativeDays } from '../../lib/date';
+import { formatDate, formatDayMonth, relativeDays, toISODate } from '../../lib/date';
 import { firstName, formatSigned, pluralize } from '../../lib/format';
-import { availableTests, labSeries, labsFor } from '../../lib/selectors';
-import { useStore } from '../../state/store';
+import { availableTests, labSeries, labsFor, recordsFor } from '../../lib/selectors';
+import type { NavIntent } from '../../lib/hooks';
+import { useNavIntent } from '../../lib/hooks';
+import { useActiveProfile } from '../../state/store';
+import { useToast } from '../../state/toast';
 import { PageHeader, useDocumentTitle } from '../../components/PageHeader';
 import { Card } from '../../components/ui/Card';
-import { Button, ButtonLink } from '../../components/ui/Button';
+import { Button, IconButton } from '../../components/ui/Button';
+import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { StatusPill } from '../../components/ui/Pill';
 import { LineChart } from '../../components/charts/LineChart';
 import type { ChartPoint } from '../../components/charts/LineChart';
+import { LabForm } from './LabForm';
 import styles from './Labs.module.css';
 
 function distanceFromRange(value: number, range: RefRange): number {
@@ -45,16 +51,26 @@ function Trend({ latest, previous, range, decimals, unit }: { latest: number; pr
 }
 
 export function LabsPage() {
-  const { data, profile, now } = useStore();
-  const [params, setParams] = useSearchParams();
+  const { data, profile, now, addLab, updateLab, deleteLab } = useActiveProfile();
+  const { notify } = useToast();
+  const [requested, setRequested] = useState<LabTestId | null>(null);
   const [showTable, setShowTable] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const tabRefs = useRef<Partial<Record<LabTestId, HTMLButtonElement | null>>>({});
   useDocumentTitle('Lab trends');
 
+  useNavIntent((intent) => {
+    if (intent.test && (LAB_TEST_IDS as readonly string[]).includes(intent.test)) setRequested(intent.test as LabTestId);
+    if (intent.add) setAdding(true);
+  });
+
   const person = personContext(profile, now);
+  const today = toISODate(now);
   const labs = useMemo(() => labsFor(data, profile.id), [data, profile.id]);
   const tests = useMemo(() => availableTests(labs), [labs]);
-  const requested = params.get('test') as LabTestId | null;
+  const reports = useMemo(() => recordsFor(data, profile.id).filter((r) => r.type === 'lab'), [data, profile.id]);
+  const editing = labs.find((l) => l.id === editingId) ?? null;
   // Default to the test with the longest history — it makes the most useful chart.
   const defaultTest = useMemo(
     () =>
@@ -67,9 +83,61 @@ export function LabsPage() {
   const testId: LabTestId | undefined = requested && tests.includes(requested) ? requested : defaultTest;
 
   const select = (id: LabTestId, focus = false) => {
-    setParams({ test: id }, { replace: true });
+    setRequested(id);
     if (focus) tabRefs.current[id]?.focus();
   };
+
+  const dialogs = (
+    <>
+      <Dialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add a lab result"
+        description={`Saved to ${firstName(profile.name)}'s lab trends in this browser.`}
+      >
+        <LabForm
+          defaultTest={testId}
+          reports={reports}
+          today={today}
+          onCancel={() => setAdding(false)}
+          onSubmit={(input) => {
+            addLab(input);
+            setRequested(input.testId);
+            setAdding(false);
+            notify(`${LAB_TESTS[input.testId].name} result added`);
+          }}
+        />
+      </Dialog>
+      <Dialog open={editing !== null} onClose={() => setEditingId(null)} title="Edit lab result">
+        {editing && (
+          <LabForm
+            key={editing.id}
+            initial={editing}
+            reports={reports}
+            today={today}
+            onCancel={() => setEditingId(null)}
+            onSubmit={(input) => {
+              updateLab(editing.id, input);
+              setRequested(input.testId);
+              setEditingId(null);
+              notify('Lab result saved');
+            }}
+            onDelete={() => {
+              deleteLab(editing.id);
+              setEditingId(null);
+              notify('Lab result deleted');
+            }}
+          />
+        )}
+      </Dialog>
+    </>
+  );
+
+  const addButton = (
+    <Button variant="primary" icon={<Plus />} onClick={() => setAdding(true)}>
+      Add result
+    </Button>
+  );
 
   const onTabKey = (e: KeyboardEvent, index: number) => {
     const last = tests.length - 1;
@@ -93,14 +161,15 @@ export function LabsPage() {
             icon={<FlaskConical />}
             title="No lab results yet"
             action={
-              <ButtonLink to="/records?new=1" variant="primary">
-                Add a lab report
-              </ButtonLink>
+              <Button variant="primary" icon={<Plus />} onClick={() => setAdding(true)}>
+                Add a lab result
+              </Button>
             }
           >
-            When lab reports with results are added, you'll see trends against reference ranges here.
+            Add results like HbA1c, cholesterol or vitamin D to see trends against reference ranges.
           </EmptyState>
         </Card>
+        {dialogs}
       </>
     );
   }
@@ -119,6 +188,7 @@ export function LabsPage() {
       <PageHeader
         title="Lab trends"
         description={`${firstName(profile.name)}'s results over time, plotted against the reference range for a ${person.age}-year-old ${profile.sex.toLowerCase()}.`}
+        actions={addButton}
       />
 
       <div className={styles.tabs} role="tablist" aria-label="Lab tests">
@@ -250,6 +320,11 @@ export function LabsPage() {
                   </th>
                   <th scope="col">Status</th>
                   <th scope="col">Report</th>
+                  {showTable && (
+                    <th scope="col">
+                      <span className="visually-hidden">Actions</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -266,13 +341,20 @@ export function LabsPage() {
                       </td>
                       <td>
                         {record ? (
-                          <Link to={`/records?open=${record.id}`} className={styles.reportLink}>
+                          <Link to="/records" state={{ open: record.id } satisfies NavIntent} className={styles.reportLink}>
                             {record.title}
                           </Link>
                         ) : (
                           '—'
                         )}
                       </td>
+                      {showTable && (
+                        <td className={styles.rowActions}>
+                          <IconButton label={`Edit result from ${formatDate(r.date)}`} onClick={() => setEditingId(r.id)}>
+                            <Pencil />
+                          </IconButton>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -293,6 +375,7 @@ export function LabsPage() {
           </div>
         </aside>
       </section>
+      {dialogs}
     </>
   );
 }

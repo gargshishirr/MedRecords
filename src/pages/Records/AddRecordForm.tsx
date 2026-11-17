@@ -1,14 +1,14 @@
 import { useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { CircleAlert } from 'lucide-react';
-import type { RecordType } from '../../lib/types';
+import type { HealthRecord, RecordType } from '../../lib/types';
 import { RECORD_TYPES } from '../../lib/types';
 import { RECORD_TYPE_META } from '../../lib/recordMeta';
 import type { NewRecordInput } from '../../lib/store';
 import type { RecordFormErrors, RecordFormValues } from '../../lib/recordForm';
-import { EMPTY_RECORD_FORM, NOTES_MAX, toRecordInput, validateRecordForm } from '../../lib/recordForm';
+import { EMPTY_RECORD_FORM, NOTES_MAX, recordToForm, toRecordInput, validateRecordForm } from '../../lib/recordForm';
 import { Field, errorId, fieldProps, inputClass, textareaClass } from '../../components/ui/Field';
-import { Button } from '../../components/ui/Button';
+import { FormActions } from '../../components/forms/FormBits';
 import { RECORD_ICONS, typeColorStyle } from '../../components/RecordTypeIcon';
 import styles from './AddRecordForm.module.css';
 
@@ -19,10 +19,17 @@ interface AddRecordFormProps {
   today: string;
   onSubmit: (input: NewRecordInput) => void;
   onCancel: () => void;
+  /** Edit this record instead of adding a new one. */
+  initial?: HealthRecord;
+  onDelete?: () => void;
+  deleteText?: string;
 }
 
-export function AddRecordForm({ today, onSubmit, onCancel }: AddRecordFormProps) {
-  const [values, setValues] = useState<RecordFormValues>({ ...EMPTY_RECORD_FORM, date: today });
+/** Add or edit a record. */
+export function AddRecordForm({ today, onSubmit, onCancel, initial, onDelete, deleteText }: AddRecordFormProps) {
+  const [values, setValues] = useState<RecordFormValues>(() =>
+    initial ? recordToForm(initial) : { ...EMPTY_RECORD_FORM, date: today },
+  );
   const [errors, setErrors] = useState<RecordFormErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -174,17 +181,16 @@ export function AddRecordForm({ today, onSubmit, onCancel }: AddRecordFormProps)
           rows={3}
           value={values.notes}
           onChange={(e) => update('notes', e.target.value)}
+          autoComplete="off"
         />
       </Field>
 
-      <div className={styles.actions}>
-        <Button variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button variant="primary" type="submit">
-          Save record
-        </Button>
-      </div>
+      <FormActions
+        submitLabel={initial ? 'Save changes' : 'Save record'}
+        onCancel={onCancel}
+        onDelete={onDelete}
+        confirmText={deleteText}
+      />
     </form>
   );
 }

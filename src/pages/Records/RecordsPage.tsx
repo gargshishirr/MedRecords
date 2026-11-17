@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { ArrowDownUp, ClipboardList, Paperclip, Plus, Search, X } from 'lucide-react';
 import type { HealthRecord, RecordType } from '../../lib/types';
 import { RECORD_TYPES } from '../../lib/types';
@@ -8,7 +7,8 @@ import { formatDayMonth, formatMonthLong, toISODate, weekdayShort } from '../../
 import { firstName, formatINR, pluralize } from '../../lib/format';
 import { recordsFor } from '../../lib/selectors';
 import type { NewRecordInput } from '../../lib/store';
-import { useStore } from '../../state/store';
+import { useNavIntent } from '../../lib/hooks';
+import { useActiveProfile } from '../../state/store';
 import { useToast } from '../../state/toast';
 import { PageHeader, useDocumentTitle } from '../../components/PageHeader';
 import { Button, IconButton } from '../../components/ui/Button';
@@ -43,34 +43,32 @@ function groupByMonth(records: HealthRecord[]) {
 }
 
 export function RecordsPage() {
-  const { data, profile, now, addRecord } = useStore();
+  const { data, profile, now, addRecord, updateRecord, deleteRecord } = useActiveProfile();
   const { notify } = useToast();
-  const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<RecordType | 'all'>('all');
   const [sort, setSort] = useState<SortKey>('newest');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useDocumentTitle('Records');
 
-  // Deep links from the command palette / other pages: ?open=<id> and ?new=1
-  useEffect(() => {
-    const open = params.get('open');
-    const isNew = params.get('new');
-    if (!open && !isNew) return;
-    if (open) {
-      setSelectedId(open);
+  // Requests from the command palette and other pages: open a record or the add form.
+  useNavIntent((intent) => {
+    if (intent.open) {
+      setSelectedId(intent.open);
       setTypeFilter('all');
       setQuery('');
     }
-    if (isNew) setAdding(true);
-    setParams({}, { replace: true });
-  }, [params, setParams]);
+    if (intent.add) setAdding(true);
+  });
 
   const all = useMemo(() => recordsFor(data, profile.id), [data, profile.id]);
   const selected = all.find((r) => r.id === selectedId) ?? null;
+  const editing = all.find((r) => r.id === editingId) ?? null;
+  const linkedLabs = (id: string) => data.labs.filter((l) => l.recordId === id).length;
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: all.length };
@@ -116,6 +114,18 @@ export function RecordsPage() {
     setSort('newest');
     setHighlightId(record.id);
     notify('Record added');
+  };
+
+  const handleDelete = (id: string) => {
+    deleteRecord(id);
+    setSelectedId(null);
+    setEditingId(null);
+    notify('Record deleted');
+  };
+
+  const deleteText = (id: string) => {
+    const n = linkedLabs(id);
+    return `Delete this record${n ? ` and its ${pluralize(n, 'lab result')}` : ''}? This cannot be undone.`;
   };
 
   const clearFilters = () => {
@@ -288,7 +298,16 @@ export function RecordsPage() {
         )}
       </div>
 
-      <RecordDetail record={selected} onClose={() => setSelectedId(null)} />
+      <RecordDetail
+        record={selected}
+        onClose={() => setSelectedId(null)}
+        onEdit={(id) => {
+          setSelectedId(null);
+          setEditingId(id);
+        }}
+        onDelete={handleDelete}
+        deleteText={selected ? deleteText(selected.id) : ''}
+      />
 
       <Dialog
         open={adding}
@@ -298,6 +317,25 @@ export function RecordsPage() {
         size="lg"
       >
         <AddRecordForm today={toISODate(now)} onSubmit={handleAdd} onCancel={() => setAdding(false)} />
+      </Dialog>
+
+      <Dialog open={editing !== null} onClose={() => setEditingId(null)} title="Edit record" size="lg">
+        {editing && (
+          <AddRecordForm
+            key={editing.id}
+            initial={editing}
+            today={toISODate(now)}
+            onSubmit={(input) => {
+              updateRecord(editing.id, input);
+              setEditingId(null);
+              setHighlightId(editing.id);
+              notify('Record saved');
+            }}
+            onCancel={() => setEditingId(null)}
+            onDelete={() => handleDelete(editing.id)}
+            deleteText={deleteText(editing.id)}
+          />
+        )}
       </Dialog>
     </>
   );

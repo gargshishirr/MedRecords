@@ -14,7 +14,12 @@ if (typeof HTMLDialogElement !== 'undefined') {
   };
 }
 
+// jsdom has no layout, so scrolling is a no-op.
+if (typeof Element !== 'undefined') Element.prototype.scrollIntoView ??= function scrollIntoView() {};
+if (typeof window !== 'undefined') window.scrollTo = () => {};
+
 afterEach(() => {
   cleanup();
-  localStorage.clear();
+  // Crypto tests run in the plain Node environment, which has no localStorage.
+  if (typeof localStorage !== 'undefined') localStorage.clear();
 });

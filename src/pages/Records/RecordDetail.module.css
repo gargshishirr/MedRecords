@@ -212,3 +212,22 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.footerStart {
+  margin-right: auto;
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  width: 100%;
+}
+
+.confirmText {
+  flex: 1 1 220px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--high-fg);
+}
