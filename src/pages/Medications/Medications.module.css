@@ -423,10 +423,10 @@
 
 .past {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1.3fr) minmax(0, 1fr) auto auto;
   grid-template-areas:
-    'icon main dates done'
-    'icon note note note';
+    'icon main dates done edit'
+    'icon note note note note';
   align-items: center;
   column-gap: var(--s-4);
   padding: var(--s-3) var(--s-5);
@@ -526,11 +526,11 @@
   }
 
   .past {
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr) auto;
     grid-template-areas:
-      'icon main'
-      'icon dates'
-      'icon note';
+      'icon main edit'
+      'icon dates dates'
+      'icon note note';
     row-gap: 4px;
     padding: var(--s-3) var(--s-4);
   }
@@ -553,4 +553,13 @@
   .day {
     max-width: none;
   }
+}
+
+.medEdit {
+  flex: none;
+  margin: -6px -6px 0 auto;
+}
+
+.pastEdit {
+  grid-area: edit;
 }

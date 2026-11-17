@@ -1,21 +1,40 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarClock, Check, Droplets, History, Pill, PillBottle, RotateCcw, Tablets } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  CalendarClock,
+  Check,
+  Droplet,
+  Droplets,
+  History,
+  Pencil,
+  Pill,
+  PillBottle,
+  Plus,
+  RotateCcw,
+  SprayCan,
+  Syringe,
+  Tablets,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Medication } from '../../lib/types';
 import { DOSE_SLOTS } from '../../lib/types';
 import { SLOT_LABEL, computeAdherence, refillStatus } from '../../lib/meds';
-import { formatDate, parseISODate, weekdayShort } from '../../lib/date';
+import { formatDate, parseISODate, toISODate, weekdayShort } from '../../lib/date';
 import { firstName, pluralize } from '../../lib/format';
 import { medicationsFor } from '../../lib/selectors';
-import { useStore } from '../../state/store';
+import { doseLogFor } from '../../lib/store';
+import type { NavIntent } from '../../lib/hooks';
+import { useNavIntent } from '../../lib/hooks';
+import { useActiveProfile } from '../../state/store';
 import { useToast } from '../../state/toast';
 import { PageHeader, useDocumentTitle } from '../../components/PageHeader';
 import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
+import { Button, IconButton } from '../../components/ui/Button';
+import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Ring } from '../../components/charts/Ring';
 import { TodayMeds, SLOT_ICONS } from '../Overview/TodayMeds';
+import { MedicationForm } from './MedicationForm';
 import styles from './Medications.module.css';
 
 const FORM_ICONS: Record<Medication['form'], LucideIcon> = {
@@ -24,11 +43,17 @@ const FORM_ICONS: Record<Medication['form'], LucideIcon> = {
   syrup: PillBottle,
   drops: Droplets,
   sachet: PillBottle,
+  inhaler: SprayCan,
+  injection: Syringe,
+  cream: Droplet,
+  other: Pill,
 };
 
+const orDash = (value: string) => value || '—';
+
 function AdherenceCard({ meds }: { meds: Medication[] }) {
-  const { data, profile, now } = useStore();
-  const summary = computeAdherence(meds, data.doseLog[profile.id], now, 7);
+  const { data, profile, now } = useActiveProfile();
+  const summary = computeAdherence(meds, doseLogFor(data, profile.id), now, 7);
   const pct = summary.ratio === null ? null : Math.round(summary.ratio * 100);
   const verdict =
     pct === null ? 'No doses were due' : pct >= 90 ? 'Excellent consistency' : pct >= 75 ? 'Mostly on track' : 'Several missed doses';
@@ -71,7 +96,7 @@ function AdherenceCard({ meds }: { meds: Medication[] }) {
 }
 
 function RefillsCard({ meds }: { meds: Medication[] }) {
-  const { now } = useStore();
+  const { now } = useActiveProfile();
   const rows = meds
     .map((m) => ({ med: m, refill: refillStatus(m, now) }))
     .sort((a, b) => a.refill.daysLeft - b.refill.daysLeft)
@@ -84,7 +109,12 @@ function RefillsCard({ meds }: { meds: Medication[] }) {
         <ul role="list" className={styles.refills}>
           {rows.map(({ med, refill }) => (
             <li key={med.id}>
-              <Link to={`/medications?med=${med.id}`} className={styles.refillRow} data-level={refill.level}>
+              <Link
+                to="/medications"
+                state={{ med: med.id } satisfies NavIntent}
+                className={styles.refillRow}
+                data-level={refill.level}
+              >
                 <span className={styles.refillName}>
                   {med.name} <span className={styles.strength}>{med.strength}</span>
                 </span>
@@ -101,8 +131,8 @@ function RefillsCard({ meds }: { meds: Medication[] }) {
   );
 }
 
-function MedicationCard({ med, highlighted }: { med: Medication; highlighted: boolean }) {
-  const { now, markRefilled } = useStore();
+function MedicationCard({ med, highlighted, onEdit }: { med: Medication; highlighted: boolean; onEdit: () => void }) {
+  const { now, markRefilled } = useActiveProfile();
   const { notify } = useToast();
   const refill = refillStatus(med, now);
   const Icon = FORM_ICONS[med.form];
@@ -117,8 +147,11 @@ function MedicationCard({ med, highlighted }: { med: Medication; highlighted: bo
           <h3 id={`med-title-${med.id}`} className={styles.medTitle}>
             {med.name} <span className={styles.strength}>{med.strength}</span>
           </h3>
-          <p className={styles.purpose}>{med.purpose}</p>
+          {med.purpose && <p className={styles.purpose}>{med.purpose}</p>}
         </div>
+        <IconButton label={`Edit ${med.name}`} className={styles.medEdit} onClick={onEdit}>
+          <Pencil />
+        </IconButton>
       </header>
 
       <ul role="list" className={styles.schedule} aria-label="Schedule">
@@ -138,15 +171,15 @@ function MedicationCard({ med, highlighted }: { med: Medication; highlighted: bo
       <dl className={styles.facts}>
         <div>
           <dt>Dose</dt>
-          <dd>{med.dose}</dd>
+          <dd>{orDash(med.dose)}</dd>
         </div>
         <div>
           <dt>Frequency</dt>
-          <dd>{med.frequency}</dd>
+          <dd>{orDash(med.frequency)}</dd>
         </div>
         <div>
           <dt>Prescriber</dt>
-          <dd>{med.prescriber}</dd>
+          <dd>{orDash(med.prescriber)}</dd>
         </div>
         <div>
           <dt>Started</dt>
@@ -189,25 +222,32 @@ function MedicationCard({ med, highlighted }: { med: Medication; highlighted: bo
 }
 
 export function MedicationsPage() {
-  const { data, profile, now } = useStore();
-  const [params, setParams] = useSearchParams();
+  const { data, profile, now, addMedication, updateMedication, deleteMedication } = useActiveProfile();
+  const { notify } = useToast();
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   useDocumentTitle('Medications');
 
   const { active, past } = useMemo(() => medicationsFor(data, profile.id, now), [data, profile.id, now]);
   const lowCount = active.filter((m) => refillStatus(m, now).level !== 'ok').length;
+  const editing = [...active, ...past].find((m) => m.id === editingId) ?? null;
+  const today = toISODate(now);
 
+  useNavIntent((intent) => {
+    if (intent.med) setHighlight(intent.med);
+    if (intent.add) setAdding(true);
+  });
+
+  // Scroll a highlighted medication into view, then fade the highlight.
   useEffect(() => {
-    const id = params.get('med');
-    if (!id) return;
-    setHighlight(id);
-    setParams({}, { replace: true });
+    if (!highlight) return;
     requestAnimationFrame(() => {
-      document.getElementById(`med-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      document.getElementById(`med-${highlight}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });
     const t = window.setTimeout(() => setHighlight(null), 2600);
     return () => window.clearTimeout(t);
-  }, [params, setParams]);
+  }, [highlight]);
 
   return (
     <>
@@ -216,6 +256,11 @@ export function MedicationsPage() {
         description={`${pluralize(active.length, 'active medication')} for ${firstName(profile.name)}${
           lowCount ? ` · ${lowCount} need${lowCount === 1 ? 's' : ''} a refill soon` : ''
         }`}
+        actions={
+          <Button variant="primary" icon={<Plus />} onClick={() => setAdding(true)}>
+            Add medication
+          </Button>
+        }
       />
 
       <div className={styles.top}>
@@ -232,14 +277,22 @@ export function MedicationsPage() {
         </h2>
         {active.length === 0 ? (
           <Card>
-            <EmptyState icon={<Pill />} title="No active medications">
-              Prescriptions you add will appear here with refill reminders.
+            <EmptyState
+              icon={<Pill />}
+              title="No active medications"
+              action={
+                <Button variant="primary" icon={<Plus />} onClick={() => setAdding(true)}>
+                  Add medication
+                </Button>
+              }
+            >
+              Medicines you add will appear here with refill reminders and a daily checklist.
             </EmptyState>
           </Card>
         ) : (
           <div className={styles.grid}>
             {active.map((m) => (
-              <MedicationCard key={m.id} med={m} highlighted={highlight === m.id} />
+              <MedicationCard key={m.id} med={m} highlighted={highlight === m.id} onEdit={() => setEditingId(m.id)} />
             ))}
           </div>
         )}
@@ -262,9 +315,7 @@ export function MedicationsPage() {
                   <span className={styles.pastName}>
                     {m.name} <span className={styles.strength}>{m.strength}</span>
                   </span>
-                  <span className={styles.pastMeta}>
-                    {m.purpose} · {m.prescriber}
-                  </span>
+                  <span className={styles.pastMeta}>{[m.purpose, m.prescriber].filter(Boolean).join(' · ') || '—'}</span>
                 </span>
                 <span className={styles.pastDates}>
                   {formatDate(m.startDate)} – {m.endDate ? formatDate(m.endDate) : 'ongoing'}
@@ -276,11 +327,55 @@ export function MedicationsPage() {
                 <span className={styles.pastDone} aria-hidden="true">
                   <Check size={14} /> Completed
                 </span>
+                <IconButton label={`Edit ${m.name}`} className={styles.pastEdit} onClick={() => setEditingId(m.id)}>
+                  <Pencil />
+                </IconButton>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <Dialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add a medication"
+        description={`Saved to ${firstName(profile.name)}'s medications in this browser.`}
+        size="lg"
+      >
+        <MedicationForm
+          today={today}
+          onCancel={() => setAdding(false)}
+          onSubmit={(input) => {
+            const med = addMedication(input);
+            setAdding(false);
+            setHighlight(med.id);
+            notify(`${input.name} added`);
+          }}
+        />
+      </Dialog>
+
+      <Dialog open={editing !== null} onClose={() => setEditingId(null)} title="Edit medication" size="lg">
+        {editing && (
+          <MedicationForm
+            key={editing.id}
+            initial={editing}
+            today={today}
+            onCancel={() => setEditingId(null)}
+            onSubmit={(input) => {
+              updateMedication(editing.id, input);
+              setEditingId(null);
+              setHighlight(editing.id);
+              notify(`${input.name} saved`);
+            }}
+            onDelete={() => {
+              deleteMedication(editing.id);
+              setEditingId(null);
+              notify(`${editing.name} deleted`);
+            }}
+          />
+        )}
+      </Dialog>
     </>
   );
 }

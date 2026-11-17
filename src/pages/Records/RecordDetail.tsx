@@ -1,7 +1,21 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, CalendarDays, FileImage, FileText, IndianRupee, ChartLine, Paperclip, Stethoscope, Clock } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  FileImage,
+  FileText,
+  IndianRupee,
+  ChartLine,
+  Paperclip,
+  Pencil,
+  Stethoscope,
+  Clock,
+  Trash2,
+} from 'lucide-react';
 import type { HealthRecord } from '../../lib/types';
-import { useStore } from '../../state/store';
+import type { NavIntent } from '../../lib/hooks';
+import { useActiveProfile } from '../../state/store';
 import { useToast } from '../../state/toast';
 import { LAB_TESTS, formatRange, labStatus, personContext } from '../../lib/ranges';
 import { formatDate, formatTime, relativeDays } from '../../lib/date';
@@ -12,11 +26,59 @@ import { StatusPill } from '../../components/ui/Pill';
 import { RecordTypeBadge } from '../../components/RecordTypeIcon';
 import styles from './RecordDetail.module.css';
 
-export function RecordDetail({ record, onClose }: { record: HealthRecord | null; onClose: () => void }) {
-  const { data, profile, now } = useStore();
+export function RecordDetail({
+  record,
+  onClose,
+  onEdit,
+  onDelete,
+  deleteText,
+}: {
+  record: HealthRecord | null;
+  onClose: () => void;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+  deleteText: string;
+}) {
+  const { data, profile, now } = useActiveProfile();
   const { notify } = useToast();
+  const [confirming, setConfirming] = useState(false);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   const person = personContext(profile, now);
   const results = record ? data.labs.filter((l) => l.recordId === record.id) : [];
+  const recordId = record?.id;
+
+  // Each record starts without a pending delete.
+  useEffect(() => setConfirming(false), [recordId]);
+  useEffect(() => {
+    if (confirming) confirmRef.current?.focus();
+  }, [confirming]);
+
+  const footer =
+    record && confirming ? (
+      <div className={styles.confirm} role="group" aria-labelledby="detail-confirm">
+        <p id="detail-confirm" className={styles.confirmText}>
+          {deleteText}
+        </p>
+        <Button variant="ghost" onClick={() => setConfirming(false)}>
+          Keep it
+        </Button>
+        <Button ref={confirmRef} variant="danger" icon={<Trash2 />} onClick={() => onDelete(record.id)}>
+          Yes, delete
+        </Button>
+      </div>
+    ) : (
+      <>
+        <Button variant="danger" icon={<Trash2 />} className={styles.footerStart} onClick={() => setConfirming(true)}>
+          Delete
+        </Button>
+        <Button variant="secondary" icon={<Pencil />} onClick={() => record && onEdit(record.id)}>
+          Edit
+        </Button>
+        <Button variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+      </>
+    );
 
   return (
     <Dialog
@@ -26,11 +88,7 @@ export function RecordDetail({ record, onClose }: { record: HealthRecord | null;
       eyebrow={record && <RecordTypeBadge type={record.type} />}
       title={record?.title ?? ''}
       description={record ? `${formatDate(record.date)} · ${relativeDays(record.date, now)}` : undefined}
-      footer={
-        <Button variant="secondary" onClick={onClose}>
-          Close
-        </Button>
-      }
+      footer={footer}
     >
       {record && (
         <div className={styles.detail}>
@@ -95,7 +153,12 @@ export function RecordDetail({ record, onClose }: { record: HealthRecord | null;
                       return (
                         <tr key={r.id}>
                           <th scope="row">
-                            <Link to={`/labs?test=${test.id}`} className={styles.testLink} onClick={onClose}>
+                            <Link
+                              to="/labs"
+                              state={{ test: test.id } satisfies NavIntent}
+                              className={styles.testLink}
+                              onClick={onClose}
+                            >
                               {test.name}
                             </Link>
                           </th>
@@ -112,7 +175,12 @@ export function RecordDetail({ record, onClose }: { record: HealthRecord | null;
                   </tbody>
                 </table>
               </div>
-              <Link to={`/labs?test=${results[0]!.testId}`} className={styles.trendLink} onClick={onClose}>
+              <Link
+                to="/labs"
+                state={{ test: results[0]!.testId } satisfies NavIntent}
+                className={styles.trendLink}
+                onClick={onClose}
+              >
                 <ChartLine size={15} aria-hidden="true" />
                 View trends for these tests
               </Link>
@@ -146,7 +214,12 @@ export function RecordDetail({ record, onClose }: { record: HealthRecord | null;
                       <button
                         type="button"
                         className={styles.file}
-                        onClick={() => notify('Attachments are placeholders in this demo', 'info')}
+                        onClick={() =>
+                          notify(
+                            data.demo ? 'Attachments are placeholders in this demo' : 'Files are not stored in MedRecords',
+                            'info',
+                          )
+                        }
                       >
                         <span className={styles.fileIcon} aria-hidden="true">
                           <Icon size={16} />

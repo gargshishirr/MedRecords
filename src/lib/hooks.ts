@@ -1,4 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+/**
+ * Things other pages ask this page to do, like "open this record". They travel
+ * in the router's history state rather than the URL, so no health data (not
+ * even an id or a test name) ends up in the address bar or browser history.
+ */
+export interface NavIntent {
+  /** Record id to open on the Records page. */
+  open?: string;
+  /** Open the "add" form on the target page. */
+  add?: boolean;
+  /** Lab test to show on the Lab trends page. */
+  test?: string;
+  /** Medication id to highlight on the Medications page. */
+  med?: string;
+}
+
+/** Runs `handler` once for each intent sent to this page, then clears it from history. */
+export function useNavIntent(handler: (intent: NavIntent) => void) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
+  useEffect(() => {
+    const intent = location.state as NavIntent | null;
+    if (!intent || typeof intent !== 'object') return;
+    handlerRef.current(intent);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location, navigate]);
+}
 
 export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() =>

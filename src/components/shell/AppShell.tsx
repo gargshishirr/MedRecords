@@ -4,6 +4,9 @@ import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { BottomNav } from './BottomNav';
 import { CommandPalette } from '../CommandPalette';
+import { ProfileEditorProvider } from '../family/ProfileEditor';
+import { NoProfiles } from '../family/NoProfiles';
+import { useStore } from '../../state/store';
 import styles from './AppShell.module.css';
 
 export function AppShell() {
@@ -11,6 +14,9 @@ export function AppShell() {
   const mainRef = useRef<HTMLElement>(null);
   const location = useLocation();
   const firstRender = useRef(true);
+  const { data } = useStore();
+  // Until someone is added, every page except Settings shows the "add your family" step.
+  const needsProfile = data.profiles.length === 0 && location.pathname !== '/settings';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -38,29 +44,31 @@ export function AppShell() {
   const closePalette = useCallback(() => setPaletteOpen(false), []);
 
   return (
-    <div className={styles.shell}>
-      <a
-        href="#main"
-        className="skip-link"
-        onClick={(e) => {
-          // HashRouter owns the URL hash, so move focus manually.
-          e.preventDefault();
-          mainRef.current?.focus();
-        }}
-      >
-        Skip to main content
-      </a>
-      <Sidebar />
-      <div className={styles.column}>
-        <TopBar onOpenPalette={openPalette} />
-        <main id="main" ref={mainRef} tabIndex={-1} className={styles.main}>
-          <div key={location.pathname} className={`${styles.page} page-enter`}>
-            <Outlet />
-          </div>
-        </main>
+    <ProfileEditorProvider>
+      <div className={styles.shell}>
+        <a
+          href="#main"
+          className="skip-link"
+          onClick={(e) => {
+            // HashRouter owns the URL hash, so move focus manually.
+            e.preventDefault();
+            mainRef.current?.focus();
+          }}
+        >
+          Skip to main content
+        </a>
+        <Sidebar />
+        <div className={styles.column}>
+          <TopBar onOpenPalette={openPalette} />
+          <main id="main" ref={mainRef} tabIndex={-1} className={styles.main}>
+            <div key={location.pathname} className={`${styles.page} page-enter`}>
+              {needsProfile ? <NoProfiles /> : <Outlet />}
+            </div>
+          </main>
+        </div>
+        <BottomNav />
+        <CommandPalette open={paletteOpen} onClose={closePalette} />
       </div>
-      <BottomNav />
-      <CommandPalette open={paletteOpen} onClose={closePalette} />
-    </div>
+    </ProfileEditorProvider>
   );
 }

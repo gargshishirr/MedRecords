@@ -13,6 +13,8 @@ interface Toast {
 
 interface ToastValue {
   notify: (message: string, tone?: Tone) => void;
+  /** Removes every toast, e.g. when the app locks so no message stays on screen. */
+  clearAll: () => void;
 }
 
 const ToastContext = createContext<ToastValue | null>(null);
@@ -35,7 +37,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
-  const value = useMemo(() => ({ notify }), [notify]);
+  const clearAll = useCallback(() => setToasts([]), []);
+  const value = useMemo(() => ({ notify, clearAll }), [notify, clearAll]);
 
   return (
     <ToastContext.Provider value={value}>

@@ -1,17 +1,32 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, CornerDownLeft, FlaskConical, Moon, Pill, Plus, Search, Sun, UserRound } from 'lucide-react';
-import { useStore } from '../state/store';
+import {
+  ArrowRight,
+  CornerDownLeft,
+  FlaskConical,
+  LockKeyhole,
+  Moon,
+  Pill,
+  Plus,
+  Search,
+  Sun,
+  UserPlus,
+  UserRound,
+} from 'lucide-react';
+import { useStore, useVault } from '../state/store';
 import { useTheme } from '../state/theme';
 import { useToast } from '../state/toast';
 import { LAB_TESTS, labStatus, personContext } from '../lib/ranges';
 import { formatDate } from '../lib/date';
+import { firstName } from '../lib/format';
+import type { NavIntent } from '../lib/hooks';
 import { RECORD_TYPE_META } from '../lib/recordMeta';
 import { latestLabs, medicationsFor, recordsFor } from '../lib/selectors';
 import { RECORD_ICONS, typeColorStyle } from './RecordTypeIcon';
 import { NAV_ITEMS, SETTINGS_ITEM } from './shell/nav';
 import { Avatar } from './ui/Avatar';
+import { useProfileEditor } from './family/ProfileEditor';
 import styles from './CommandPalette.module.css';
 
 interface Command {
@@ -40,6 +55,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const listId = useId();
   const navigate = useNavigate();
   const { data, profile, now, setActiveProfile } = useStore();
+  const { lockEnabled, lockNow } = useVault();
+  const { openNew: addPerson } = useProfileEditor();
   const { resolved, toggle } = useTheme();
   const { notify } = useToast();
   const onCloseRef = useRef(onClose);
@@ -68,16 +85,55 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, []);
 
   const commands = useMemo<Command[]>(() => {
-    const person = personContext(profile, now);
-    const list: Command[] = [
-      {
-        id: 'action-add',
+    const go = (to: string, intent?: NavIntent) => () => navigate(to, intent ? { state: intent } : undefined);
+    const list: Command[] = [];
+    if (profile) {
+      list.push(
+        {
+          id: 'action-add',
+          group: 'Actions',
+          label: 'Add a record',
+          keywords: 'new create visit report',
+          icon: <Plus />,
+          run: go('/records', { add: true }),
+        },
+        {
+          id: 'action-add-med',
+          group: 'Actions',
+          label: 'Add a medication',
+          keywords: 'new medicine prescription pill',
+          icon: <Pill />,
+          run: go('/medications', { add: true }),
+        },
+        {
+          id: 'action-add-lab',
+          group: 'Actions',
+          label: 'Add a lab result',
+          keywords: 'new test blood report',
+          icon: <FlaskConical />,
+          run: go('/labs', { add: true }),
+        },
+      );
+    }
+    list.push({
+      id: 'action-person',
+      group: 'Actions',
+      label: 'Add a family member',
+      keywords: 'new person profile',
+      icon: <UserPlus />,
+      run: addPerson,
+    });
+    if (lockEnabled) {
+      list.push({
+        id: 'action-lock',
         group: 'Actions',
-        label: 'Add a record',
-        keywords: 'new create upload',
-        icon: <Plus />,
-        run: () => navigate('/records?new=1'),
-      },
+        label: 'Lock now',
+        keywords: 'lock passcode secure hide',
+        icon: <LockKeyhole />,
+        run: lockNow,
+      });
+    }
+    list.push(
       {
         id: 'action-theme',
         group: 'Actions',
@@ -94,11 +150,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
           label: item.label,
           keywords: 'navigate page open',
           icon: <Icon />,
-          run: () => navigate(item.to),
+          run: go(item.to),
         };
       }),
-    ];
+    );
+    if (!profile) return list;
 
+    const person = personContext(profile, now);
     for (const r of recordsFor(data, profile.id)) {
       const Icon = RECORD_ICONS[r.type];
       list.push({
@@ -112,7 +170,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             <Icon />
           </span>
         ),
-        run: () => navigate(`/records?open=${encodeURIComponent(r.id)}`),
+        run: go('/records', { open: r.id }),
       });
     }
 
@@ -126,7 +184,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         hint: `Latest ${latest.value.toFixed(test.decimals)} ${test.unit}${status === 'normal' ? '' : ` · ${status}`}`,
         keywords: `${test.short} lab trend chart`,
         icon: <FlaskConical />,
-        run: () => navigate(`/labs?test=${test.id}`),
+        run: go('/labs', { test: test.id }),
       });
     }
 
@@ -136,11 +194,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       list.push({
         id: `med-${m.id}`,
         group: 'Medications',
-        label: `${m.name} ${m.strength}`,
-        hint: `${isActive ? 'Active' : 'Past'} · ${m.purpose}`,
+        label: [m.name, m.strength].filter(Boolean).join(' '),
+        hint: [isActive ? 'Active' : 'Past', m.purpose].filter(Boolean).join(' · '),
         keywords: `${m.frequency} ${m.prescriber}`,
         icon: <Pill />,
-        run: () => navigate(`/medications?med=${encodeURIComponent(m.id)}`),
+        run: go('/medications', { med: m.id }),
       });
     }
 
@@ -159,7 +217,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       });
     }
     return list;
-  }, [data, profile, now, resolved, toggle, navigate, setActiveProfile, notify]);
+  }, [data, profile, now, resolved, toggle, navigate, setActiveProfile, notify, lockEnabled, lockNow, addPerson]);
 
   const results = useMemo(() => {
     const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -239,7 +297,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
               aria-autocomplete="list"
               aria-activedescendant={results.length ? optionId(clampedActive) : undefined}
               aria-label="Search records, labs, medications and pages"
-              placeholder={`Search ${profile.name.split(' ')[0]}'s records, labs, medications…`}
+              placeholder={
+                profile ? `Search ${firstName(profile.name)}'s records, labs, medications…` : 'Search pages and actions…'
+              }
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);

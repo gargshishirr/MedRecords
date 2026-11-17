@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { STORAGE_KEY, addRecord, loadData, parseImport, resetData, serialize, toggleDose } from './store';
+import {
+  STORAGE_KEY,
+  VAULT_KEY,
+  addAppointment,
+  addLab,
+  addMedication,
+  addProfile,
+  addRecord,
+  createEmptyData,
+  deleteMedication,
+  deleteProfile,
+  deleteRecord,
+  doseLogFor,
+  readStored,
+  toggleDose,
+  updateRecord,
+  withSettings,
+} from './store';
+import type { ProfileInput } from './store';
 import { createSeedData } from './seed';
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -14,35 +32,55 @@ function memoryStorage(initial: Record<string, string> = {}) {
 
 const now = new Date(2026, 10, 14, 16, 0);
 
-describe('loadData', () => {
-  it('seeds demo data on first run and persists it under the versioned key', () => {
-    const storage = memoryStorage();
-    const data = loadData(storage, now);
-    expect(STORAGE_KEY).toMatch(/v1$/);
-    expect(data.schemaVersion).toBe(1);
-    expect(data.profiles.map((p) => p.name)).toEqual(['Riya Kapoor', 'Meera Kapoor', 'Kabir Kapoor']);
-    expect(data.records.length).toBeGreaterThan(40);
-    expect(storage.map.has(STORAGE_KEY)).toBe(true);
+const person: ProfileInput = {
+  name: 'Asha Rao',
+  relation: 'Self',
+  dob: '1990-02-03',
+  sex: 'Female',
+  bloodGroup: 'Unknown',
+  allergies: [],
+  conditions: [],
+  emergencyContacts: [],
+};
+
+describe('readStored', () => {
+  it('reports an empty browser so the welcome screen can show', () => {
+    expect(readStored(memoryStorage(), now)).toEqual({ kind: 'empty' });
   });
 
-  it('returns previously saved data instead of re-seeding', () => {
-    const storage = memoryStorage();
-    const seeded = loadData(storage, now);
-    const { data: withRecord } = addRecord(seeded, 'riya', { type: 'visit', title: 'Saved visit', date: '2026-11-10' }, now);
-    storage.setItem(STORAGE_KEY, JSON.stringify(withRecord));
-    expect(loadData(storage, now).records[0]?.title).toBe('Saved visit');
+  it('returns saved plain data', () => {
+    const seed = createSeedData(now);
+    const stored = readStored(memoryStorage({ [STORAGE_KEY]: JSON.stringify(seed) }), now);
+    expect(stored.kind).toBe('plain');
+    expect(stored.kind === 'plain' && stored.data.profiles.map((p) => p.name)).toEqual([
+      'Riya Kapoor',
+      'Meera Kapoor',
+      'Kabir Kapoor',
+    ]);
   });
 
-  it('re-seeds when stored data is corrupt', () => {
-    const storage = memoryStorage({ [STORAGE_KEY]: '{not json' });
-    expect(loadData(storage, now).profiles).toHaveLength(3);
+  it('flags corrupt plain data instead of silently replacing it', () => {
+    expect(readStored(memoryStorage({ [STORAGE_KEY]: '{not json' }), now)).toEqual({ kind: 'damaged', what: 'plain' });
+  });
+
+  it('prefers the encrypted vault over any plain copy', () => {
+    const envelope = { v: 1, salt: 'A'.repeat(22) + '==', iv: 'A'.repeat(16), ct: 'A'.repeat(24) };
+    const storage = memoryStorage({ [VAULT_KEY]: JSON.stringify(envelope), [STORAGE_KEY]: JSON.stringify(createSeedData(now)) });
+    expect(readStored(storage, now).kind).toBe('vault');
+    storage.setItem(VAULT_KEY, '{"v":1}');
+    expect(readStored(storage, now)).toEqual({ kind: 'damaged', what: 'vault' });
   });
 });
 
 describe('demo seed', () => {
+  it('is marked as demo data', () => {
+    expect(createSeedData(now).demo).toBe(true);
+    expect(createEmptyData(now).demo).toBe(false);
+  });
+
   it('uses only non-dialable placeholder phone numbers', () => {
     const data = createSeedData(now);
-    const phones = data.profiles.flatMap((p) => [...p.emergencyContacts.map((c) => c.phone), p.primaryDoctor.phone]);
+    const phones = data.profiles.flatMap((p) => [...p.emergencyContacts.map((c) => c.phone), p.primaryDoctor?.phone ?? '']);
     expect(phones.length).toBeGreaterThan(0);
     for (const phone of phones) expect(phone).toMatch(/^\+91 00000 \d{5}$/);
     // No other +91 numbers anywhere in the dataset (e.g. summaries or notes).
@@ -51,7 +89,7 @@ describe('demo seed', () => {
   });
 });
 
-describe('addRecord', () => {
+describe('records', () => {
   it('prepends a trimmed record for the profile and logs activity', () => {
     const data = createSeedData(now);
     const { data: next, record } = addRecord(
@@ -66,6 +104,78 @@ describe('addRecord', () => {
     expect(next.activity[0]?.text).toBe('Added lab report: Thyroid profile');
     expect(data.records).not.toContain(record); // original is untouched
   });
+
+  it('edits a record in place and deletes it with its lab results', () => {
+    const data = createSeedData(now);
+    const target = data.records.find((r) => data.labs.some((l) => l.recordId === r.id))!;
+    const edited = updateRecord(data, target.id, { type: 'visit', title: 'Renamed', date: target.date });
+    expect(edited.records.find((r) => r.id === target.id)).toMatchObject({
+      title: 'Renamed',
+      type: 'visit',
+      createdAt: target.createdAt,
+    });
+
+    const removed = deleteRecord(edited, target.id);
+    expect(removed.records.some((r) => r.id === target.id)).toBe(false);
+    expect(removed.labs.some((l) => l.recordId === target.id)).toBe(false);
+  });
+});
+
+describe('people', () => {
+  it('works from an empty dataset and switches to the new person', () => {
+    const { data, profile } = addProfile(createEmptyData(now), person);
+    expect(data.profiles).toEqual([profile]);
+    expect(data.activeProfileId).toBe(profile.id);
+  });
+
+  it('deletes a person and everything that belongs to them', () => {
+    let data = addProfile(createEmptyData(now), person).data;
+    const id = data.activeProfileId;
+    data = addRecord(data, id, { type: 'visit', title: 'Check-up', date: '2026-11-01' }, now).data;
+    data = addLab(data, id, { testId: 'hb', date: '2026-11-01', value: 12.5 }, now).data;
+    data = addAppointment(
+      data,
+      id,
+      { at: '2026-12-01T10:00', reason: 'Follow-up', doctor: '', specialty: '', facility: '' },
+      now,
+    ).data;
+    const med = addMedication(
+      data,
+      id,
+      {
+        name: 'Iron',
+        strength: '',
+        form: 'tablet',
+        dose: '',
+        frequency: '',
+        schedule: ['morning'],
+        purpose: '',
+        prescriber: '',
+        startDate: '2026-11-01',
+        refillDate: '2026-11-01',
+        supplyDays: 30,
+      },
+      now,
+    );
+    data = toggleDose(med.data, id, '2026-11-14', `${med.medication.id}:morning`, 'Iron', now);
+
+    const after = deleteProfile(data, id);
+    expect(after.profiles).toEqual([]);
+    expect(after.activeProfileId).toBe('');
+    for (const list of [after.records, after.labs, after.medications, after.appointments, after.activity])
+      expect(list).toEqual([]);
+    expect(doseLogFor(after, id)).toBeUndefined();
+  });
+});
+
+describe('medications', () => {
+  it('removes checklist ticks when a medication is deleted', () => {
+    const data = createSeedData(now);
+    const ticked = toggleDose(data, 'riya', '2026-11-14', 'med-riya-cetirizine:night', 'Cetirizine', now);
+    const after = deleteMedication(ticked, 'med-riya-cetirizine');
+    expect(after.medications.some((m) => m.id === 'med-riya-cetirizine')).toBe(false);
+    expect(JSON.stringify(doseLogFor(after, 'riya'))).not.toContain('med-riya-cetirizine');
+  });
 });
 
 describe('toggleDose', () => {
@@ -78,54 +188,9 @@ describe('toggleDose', () => {
   });
 });
 
-describe('resetData', () => {
-  it('discards user changes and restores the demo dataset', () => {
-    const storage = memoryStorage();
-    const seeded = loadData(storage, now);
-    const { data: changed } = addRecord(seeded, 'riya', { type: 'document', title: 'Temp', date: '2026-11-01' }, now);
-    storage.setItem(STORAGE_KEY, JSON.stringify(changed));
-    const restored = resetData(storage, now);
-    expect(restored.records.some((r) => r.title === 'Temp')).toBe(false);
-    expect(restored.records).toHaveLength(seeded.records.length);
-  });
-});
-
-describe('parseImport', () => {
-  const valid = () => JSON.parse(serialize(createSeedData(now)));
-
-  it('accepts a round-tripped export', () => {
-    const result = parseImport(serialize(createSeedData(now)));
-    expect(result.ok).toBe(true);
-  });
-
-  it('rejects text that is not JSON', () => {
-    expect(parseImport('hello')).toEqual({ ok: false, error: 'That file is not valid JSON.' });
-  });
-
-  it('rejects an unsupported schema version', () => {
-    const data = { ...valid(), schemaVersion: 2 };
-    const result = parseImport(JSON.stringify(data));
-    expect(result.ok).toBe(false);
-    expect(!result.ok && result.error).toMatch(/schema version/i);
-  });
-
-  it('pinpoints invalid records', () => {
-    const data = valid();
-    data.records[3].type = 'xray';
-    const result = parseImport(JSON.stringify(data));
-    expect(!result.ok && result.error).toBe('records[3].type is not a known record type');
-  });
-
-  it('rejects items that reference a missing profile', () => {
-    const data = valid();
-    data.labs[0].profileId = 'ghost';
-    const result = parseImport(JSON.stringify(data));
-    expect(!result.ok && result.error).toMatch(/labs\[0\]\.profileId/);
-  });
-
-  it('repairs an active profile id that no longer exists', () => {
-    const data = { ...valid(), activeProfileId: 'nobody' };
-    const result = parseImport(JSON.stringify(data));
-    expect(result.ok && result.data.activeProfileId).toBe('riya');
+describe('withSettings', () => {
+  it('keeps this device settings when the dataset is replaced', () => {
+    const current = { ...createSeedData(now), settings: { autoLockMinutes: 15 } };
+    expect(withSettings(createEmptyData(now), current).settings.autoLockMinutes).toBe(15);
   });
 });

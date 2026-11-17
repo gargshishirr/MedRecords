@@ -3,19 +3,29 @@ export type ISODate = string;
 /** ISO local date-time without timezone, e.g. `2026-11-14T10:30`. */
 export type ISODateTime = string;
 
-export type Sex = 'Female' | 'Male';
-export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+export const SEXES = ['Female', 'Male'] as const;
+export type Sex = (typeof SEXES)[number];
+
+export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'] as const;
+export type BloodGroup = (typeof BLOOD_GROUPS)[number];
+
+export const ALLERGY_SEVERITIES = ['mild', 'moderate', 'severe'] as const;
+export type AllergySeverity = (typeof ALLERGY_SEVERITIES)[number];
 
 export interface Allergy {
   name: string;
-  severity: 'mild' | 'moderate' | 'severe';
+  severity: AllergySeverity;
   reaction: string;
 }
 
+export const CONDITION_STATUSES = ['active', 'managed', 'resolved'] as const;
+export type ConditionStatus = (typeof CONDITION_STATUSES)[number];
+
 export interface Condition {
   name: string;
-  since: ISODate;
-  status: 'active' | 'managed' | 'resolved';
+  /** When it was diagnosed, if known. */
+  since?: ISODate;
+  status: ConditionStatus;
 }
 
 export interface EmergencyContact {
@@ -31,20 +41,28 @@ export interface Doctor {
   phone: string;
 }
 
+/** Parts of the emergency card (and its QR code) a person can choose to hide. */
+export const CARD_SECTIONS = ['dob', 'conditions', 'medications', 'doctor'] as const;
+export type CardSection = (typeof CARD_SECTIONS)[number];
+
 export interface Profile {
   id: string;
   name: string;
+  /** Free text, e.g. "Self", "Mother", "Son". */
   relation: string;
   dob: ISODate;
   sex: Sex;
   bloodGroup: BloodGroup;
-  heightCm: number;
+  /** Used for BMI. Optional because many people don't know it. */
+  heightCm?: number;
   /** Hue (0–360) used for the avatar tint. */
   hue: number;
   allergies: Allergy[];
   conditions: Condition[];
   emergencyContacts: EmergencyContact[];
-  primaryDoctor: Doctor;
+  primaryDoctor?: Doctor;
+  /** Sections hidden from the emergency card and its QR code. */
+  cardHidden?: CardSection[];
 }
 
 export const RECORD_TYPES = ['visit', 'lab', 'prescription', 'imaging', 'vaccination', 'document'] as const;
@@ -101,12 +119,25 @@ export interface VitalReading {
 export const DOSE_SLOTS = ['morning', 'afternoon', 'night'] as const;
 export type DoseSlot = (typeof DOSE_SLOTS)[number];
 
+export const MEDICATION_FORMS = [
+  'tablet',
+  'capsule',
+  'syrup',
+  'drops',
+  'sachet',
+  'inhaler',
+  'injection',
+  'cream',
+  'other',
+] as const;
+export type MedicationForm = (typeof MEDICATION_FORMS)[number];
+
 export interface Medication {
   id: string;
   profileId: string;
   name: string;
   strength: string;
-  form: 'tablet' | 'capsule' | 'syrup' | 'drops' | 'sachet';
+  form: MedicationForm;
   dose: string;
   frequency: string;
   schedule: DoseSlot[];
@@ -131,20 +162,34 @@ export interface Appointment {
   reason: string;
 }
 
+export const ACTIVITY_KINDS = ['record', 'dose', 'refill', 'appointment', 'data'] as const;
+
 export interface ActivityItem {
   id: string;
   profileId: string;
   at: string;
-  kind: 'record' | 'dose' | 'refill' | 'appointment' | 'data';
+  kind: (typeof ACTIVITY_KINDS)[number];
   text: string;
 }
 
 /** profileId → ISO date → list of `${medicationId}:${slot}` keys taken that day. */
 export type DoseLog = Record<string, Record<ISODate, string[]>>;
 
+export const AUTO_LOCK_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const;
+export const DEFAULT_AUTO_LOCK_MINUTES = 5;
+
+export interface AppSettings {
+  /** Minutes of inactivity before the app locks (only used when a passcode is set). */
+  autoLockMinutes: number;
+}
+
 export interface AppData {
   schemaVersion: 1;
+  /** True for the fictional demo family, false for a person's own data. */
+  demo: boolean;
+  /** When this dataset was created (demo seed or "start fresh"). */
   seededAt: string;
+  /** Empty when there are no people yet. */
   activeProfileId: string;
   profiles: Profile[];
   records: HealthRecord[];
@@ -154,6 +199,7 @@ export interface AppData {
   appointments: Appointment[];
   doseLog: DoseLog;
   activity: ActivityItem[];
+  settings: AppSettings;
 }
 
 export type RangeStatus = 'normal' | 'watch' | 'high' | 'low';
