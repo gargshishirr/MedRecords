@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { LOCK_SIGNAL_KEY, STORAGE_KEY, VAULT_KEY, addProfile, createEmptyData } from './lib/store';
+import { LOCK_SIGNAL_KEY, STORAGE_KEY, VAULT_KEY, addProfile, addRecord, createEmptyData } from './lib/store';
+import { fileStore } from './lib/files';
+import { toISODate } from './lib/date';
 import type { ProfileInput } from './lib/store';
 import { createSeedData } from './lib/seed';
 import { createVaultKey, encryptText } from './lib/crypto';
@@ -428,9 +430,61 @@ describe('backups', () => {
   it('explains why a file was rejected and leaves the data alone', async () => {
     const { container } = renderApp({ path: '/settings', data: onePerson() });
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
-    const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'huge.json');
+    const big = new File(['{}'], 'huge.json');
+    Object.defineProperty(big, 'size', { value: 250 * 1024 * 1024 + 1 });
     fireEvent.change(input, { target: { files: [big] } });
-    expect(await screen.findByRole('alert')).toHaveTextContent('That file is too big. MedRecords backups must be under 5 MB.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('That file is too big. MedRecords backups must be under 250 MB.');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).profiles[0].name).toBe('Asha Rao');
+  });
+});
+
+describe('attached files', () => {
+  it('attaches a PDF encrypted, then removes it', async () => {
+    // jsdom has no blob: URLs.
+    Object.assign(URL, { createObjectURL: () => 'blob:test', revokeObjectURL: () => undefined });
+    const user = userEvent.setup();
+    const { data } = addRecord(onePerson(), '', { type: 'lab', title: 'Thyroid profile', date: '2026-11-01' });
+    const owned = { ...data, records: data.records.map((r) => ({ ...r, profileId: data.profiles[0]!.id })) };
+    renderApp({ path: '/records', data: owned });
+
+    await user.click(await screen.findByRole('button', { name: /Thyroid profile/ }));
+    const sheet = await dialog('Thyroid profile');
+    const pdf = new File(['%PDF-1.7\n%%EOF'], 'tsh report.pdf', { type: 'application/pdf' });
+    await user.upload(within(sheet).getByLabelText('Choose photos or PDFs'), pdf);
+    expect(await screen.findByText('1 file added')).toBeInTheDocument();
+
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    const [attachment] = saved.records[0].attachments;
+    expect(attachment).toMatchObject({ name: 'tsh report.pdf', type: 'application/pdf' });
+    expect(saved.fileKey).toHaveLength(44);
+    const stored = await fileStore().get(attachment.fileId);
+    expect(new TextDecoder().decode(stored!.ct)).not.toContain('%PDF');
+
+    await user.click(within(sheet).getByRole('button', { name: /tsh report\.pdf/ }));
+    const viewer = await dialog('tsh report.pdf');
+    await user.click(within(viewer).getByRole('button', { name: 'Remove' }));
+    await user.click(within(viewer).getByRole('button', { name: 'Yes, remove' }));
+    await waitFor(async () => expect(await fileStore().get(attachment.fileId)).toBeUndefined());
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).records[0].attachments).toEqual([]);
+  });
+});
+
+describe('vaccine schedule', () => {
+  it('shows what a child is due and marks a dose as given', async () => {
+    const user = userEvent.setup();
+    const dob = new Date();
+    dob.setMonth(dob.getMonth() - 5);
+    const child = addProfile(createEmptyData(), { ...person, name: 'Ira Rao', relation: 'Daughter', dob: toISODate(dob) }).data;
+    renderApp({ path: '/', data: child });
+    expect(await screen.findByRole('heading', { name: 'Vaccines' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Schedule' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Vaccines' })).toBeInTheDocument();
+    expect(screen.getByText(/overdue · \d+ due now/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^BCG/ }));
+    const form = await dialog('BCG');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('BCG marked as given')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).profiles[0].vaccines.bcg).toBe(toISODate(new Date()));
   });
 });

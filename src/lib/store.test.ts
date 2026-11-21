@@ -190,7 +190,8 @@ describe('toggleDose', () => {
 
 describe('withSettings', () => {
   it('keeps this device settings when the dataset is replaced', () => {
-    const current = { ...createSeedData(now), settings: { autoLockMinutes: 15 } };
+    const seed = createSeedData(now);
+    const current = { ...seed, settings: { ...seed.settings, autoLockMinutes: 15 } };
     expect(withSettings(createEmptyData(now), current).settings.autoLockMinutes).toBe(15);
   });
 });

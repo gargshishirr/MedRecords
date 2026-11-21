@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CalendarArrowDown,
   CalendarDays,
   CalendarPlus,
   ClipboardList,
   FlaskConical,
-  History,
-  IdCard,
+  FileHeart,
   Minus,
   Pencil,
   Plus,
@@ -37,7 +37,11 @@ import {
   toISODate,
 } from '../../lib/date';
 import { firstName, formatSigned } from '../../lib/format';
-import { activityFor, latestLabs, upcomingAppointments } from '../../lib/selectors';
+import { latestLabs, upcomingAppointments } from '../../lib/selectors';
+import { appointmentCalendar, calendarFileName } from '../../lib/calendar';
+import { downloadText } from '../../lib/backup';
+import { VaccinesCard } from '../Vaccines/VaccinesPage';
+import { hasSchedule } from '../../lib/vaccines';
 import type { NavIntent } from '../../lib/hooks';
 import { VitalsSnapshot } from './VitalsSnapshot';
 import { TodayMeds } from './TodayMeds';
@@ -161,9 +165,20 @@ function Upcoming() {
                   <span className={styles.apptWhen} data-soon={soon || undefined}>
                     {relativeDays(a.at, now)}
                   </span>
-                  <IconButton label={`Edit appointment: ${a.reason}`} onClick={() => setEditingId(a.id)}>
-                    <Pencil />
-                  </IconButton>
+                  <span className={styles.apptButtons}>
+                    <IconButton
+                      label={`Add to calendar: ${a.reason}`}
+                      onClick={() => {
+                        downloadText(appointmentCalendar(a, firstName(profile.name), now), calendarFileName(a.reason), 'text/calendar');
+                        notify('Calendar file downloaded. Open it to add the appointment.');
+                      }}
+                    >
+                      <CalendarArrowDown />
+                    </IconButton>
+                    <IconButton label={`Edit appointment: ${a.reason}`} onClick={() => setEditingId(a.id)}>
+                      <Pencil />
+                    </IconButton>
+                  </span>
                 </span>
               </li>
             );
@@ -261,37 +276,6 @@ function AllergiesConditions() {
   );
 }
 
-function activityTime(at: string, now: Date): string {
-  const diff = daysBetween(at, now);
-  if (diff === 0) return `Today, ${formatTime(at)}`;
-  if (diff === 1) return `Yesterday, ${formatTime(at)}`;
-  return relativeDays(at.slice(0, 10), now);
-}
-
-function RecentActivity() {
-  const { data, profile, now } = useActiveProfile();
-  const items = activityFor(data, profile.id, 5);
-  return (
-    <Card title="Recent activity" icon={<History />}>
-      {items.length === 0 ? (
-        <EmptyState icon={<History />} title="No activity yet" compact />
-      ) : (
-        <ol role="list" className={styles.timeline}>
-          {items.map((item) => (
-            <li key={item.id} className={styles.timelineItem} data-kind={item.kind}>
-              <span className={styles.timelineDot} aria-hidden="true" />
-              <span className={styles.timelineText}>{item.text}</span>
-              <time className={styles.timelineTime} dateTime={item.at}>
-                {activityTime(item.at, now)}
-              </time>
-            </li>
-          ))}
-        </ol>
-      )}
-    </Card>
-  );
-}
-
 export function OverviewPage() {
   const { data, profile, now } = useActiveProfile();
   useDocumentTitle('Overview');
@@ -310,8 +294,8 @@ export function OverviewPage() {
         }
         actions={
           <>
-            <ButtonLink to="/emergency" icon={<IdCard />}>
-              Emergency card
+            <ButtonLink to="/summary" icon={<FileHeart />}>
+              Doctor summary
             </ButtonLink>
             <ButtonLink to="/records" state={{ add: true } satisfies NavIntent} variant="primary" icon={<Plus />}>
               Add record
@@ -330,7 +314,7 @@ export function OverviewPage() {
         <div className={styles.col}>
           <Upcoming />
           <AllergiesConditions />
-          <RecentActivity />
+          {hasSchedule(profile, now) && <VaccinesCard />}
         </div>
       </div>
 

@@ -3,11 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   Building2,
   CalendarDays,
-  FileImage,
-  FileText,
   IndianRupee,
   ChartLine,
-  Paperclip,
   Pencil,
   Stethoscope,
   Clock,
@@ -16,10 +13,10 @@ import {
 import type { HealthRecord } from '../../lib/types';
 import type { NavIntent } from '../../lib/hooks';
 import { useActiveProfile } from '../../state/store';
-import { useToast } from '../../state/toast';
 import { LAB_TESTS, formatRange, labStatus, personContext } from '../../lib/ranges';
 import { formatDate, formatTime, relativeDays } from '../../lib/date';
-import { formatFileSize, formatINR } from '../../lib/format';
+import { formatINR } from '../../lib/format';
+import { Attachments } from '../../components/files/Attachments';
 import { Dialog } from '../../components/ui/Dialog';
 import { Button } from '../../components/ui/Button';
 import { StatusPill } from '../../components/ui/Pill';
@@ -40,7 +37,6 @@ export function RecordDetail({
   deleteText: string;
 }) {
   const { data, profile, now } = useActiveProfile();
-  const { notify } = useToast();
   const [confirming, setConfirming] = useState(false);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const person = personContext(profile, now);
@@ -196,43 +192,7 @@ export function RecordDetail({
             </section>
           )}
 
-          <section className={styles.section} aria-labelledby="detail-files">
-            <h3 id="detail-files" className={styles.sectionTitle}>
-              Attachments
-            </h3>
-            {record.attachments.length === 0 ? (
-              <p className={styles.muted}>
-                <Paperclip size={14} aria-hidden="true" /> No files attached.
-              </p>
-            ) : (
-              <ul role="list" className={styles.files}>
-                {record.attachments.map((f) => {
-                  const isImage = /\.(jpe?g|png|zip)$/i.test(f.name);
-                  const Icon = isImage ? FileImage : FileText;
-                  return (
-                    <li key={f.name}>
-                      <button
-                        type="button"
-                        className={styles.file}
-                        onClick={() =>
-                          notify(
-                            data.demo ? 'Attachments are placeholders in this demo' : 'Files are not stored in MedRecords',
-                            'info',
-                          )
-                        }
-                      >
-                        <span className={styles.fileIcon} aria-hidden="true">
-                          <Icon size={16} />
-                        </span>
-                        <span className={styles.fileName}>{f.name}</span>
-                        <span className={styles.fileSize}>{formatFileSize(f.sizeKb)}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
+          <Attachments record={record} />
 
           <p className={styles.added}>
             <Clock size={13} aria-hidden="true" />

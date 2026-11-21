@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { MAX_IMPORT_BYTES, TOO_BIG_MESSAGE, parseAppDataJson, safeJsonParse, validateAppData } from './validate';
-import { readFileText } from './backup';
+import { BACKUP_TOO_BIG, MAX_BACKUP_BYTES, readFileText } from './backup';
 import { createEmptyData } from './store';
 import { createSeedData } from './seed';
+import { DEFAULT_REMINDERS } from './types';
 
 const now = new Date(2026, 10, 14, 16, 0);
 const seed = () => createSeedData(now);
@@ -35,7 +36,7 @@ describe('valid data', () => {
     delete legacy.settings;
     const result = parseAppDataJson(asJson(legacy), now);
     expect(result.ok && result.data.demo).toBe(true);
-    expect(result.ok && result.data.settings).toEqual({ autoLockMinutes: 5 });
+    expect(result.ok && result.data.settings).toEqual({ autoLockMinutes: 5, reminders: DEFAULT_REMINDERS });
   });
 
   it('repairs an active profile id that no longer exists', () => {
@@ -167,9 +168,10 @@ describe('size limit', () => {
     expect(parseAppDataJson(huge, now)).toEqual({ ok: false, error: TOO_BIG_MESSAGE });
   });
 
-  it('refuses files over 5 MB without reading them', async () => {
-    const file = new Blob([new Uint8Array(MAX_IMPORT_BYTES + 1)]);
-    expect(await readFileText(file)).toEqual({ ok: false, error: TOO_BIG_MESSAGE });
+  it('refuses backup files over 250 MB without reading them', async () => {
+    const file = new Blob(['{}']);
+    Object.defineProperty(file, 'size', { value: MAX_BACKUP_BYTES + 1 });
+    expect(await readFileText(file)).toEqual({ ok: false, error: BACKUP_TOO_BIG });
     const small = new Blob(['{"ok":true}']);
     expect(await readFileText(small)).toEqual({ ok: true, text: '{"ok":true}' });
   });

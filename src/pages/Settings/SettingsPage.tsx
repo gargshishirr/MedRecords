@@ -1,29 +1,23 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   CircleAlert,
   Database,
   Download,
   ExternalLink,
-  Info,
-  Monitor,
-  Moon,
-  Palette,
   Pencil,
   RotateCcw,
   Sparkles,
-  Sun,
   Upload,
   UserPlus,
   Users,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import type { AppData } from '../../lib/types';
 import type { Envelope } from '../../lib/crypto';
-import type { ThemePreference } from '../../state/theme';
-import { useTheme } from '../../state/theme';
 import { useStore, useVault } from '../../state/store';
 import { useToast } from '../../state/toast';
 import { readBackup, readFileText } from '../../lib/backup';
+import type { BackupFile } from '../../lib/files';
+import { fileStore, relinkAttachments, restoreBackupFiles } from '../../lib/files';
 import { ageInYears, formatDate, toISODate } from '../../lib/date';
 import { pluralize } from '../../lib/format';
 import { PageHeader, useDocumentTitle } from '../../components/PageHeader';
@@ -35,13 +29,8 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useProfileEditor } from '../../components/family/ProfileEditor';
 import { LockCard } from './LockCard';
 import { BackupPasscodeForm, ExportForm } from './BackupForms';
+import { DeviceCard, RemindersCard } from './DeviceCards';
 import styles from './Settings.module.css';
-
-const THEMES: { value: ThemePreference; label: string; hint: string; icon: LucideIcon }[] = [
-  { value: 'light', label: 'Light', hint: 'Warm and bright', icon: Sun },
-  { value: 'dark', label: 'Dark', hint: 'Easy on the eyes', icon: Moon },
-  { value: 'system', label: 'System', hint: 'Match your device', icon: Monitor },
-];
 
 type Confirm = 'fresh' | 'demo' | null;
 
@@ -98,7 +87,6 @@ function FamilyCard() {
 }
 
 export function SettingsPage() {
-  const { preference, setPreference } = useTheme();
   const { data, replaceData, startFresh, loadDemo } = useStore();
   const { lockEnabled } = useVault();
   const { notify } = useToast();
@@ -106,12 +94,19 @@ export function SettingsPage() {
   const [exporting, setExporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [encryptedBackup, setEncryptedBackup] = useState<Envelope | null>(null);
-  const [pendingImport, setPendingImport] = useState<AppData | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ data: AppData; files: BackupFile[] } | null>(null);
+  const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const importId = useId();
+  const mounted = useRef(true);
+  const importCancelled = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useDocumentTitle('Settings');
-
-  const sizeKb = Math.round(new Blob([JSON.stringify(data)]).size / 1024);
 
   const failImport = (error: string) => {
     setImportError(error);
@@ -127,55 +122,64 @@ export function SettingsPage() {
     if (backup.kind === 'error') return failImport(backup.error);
     setImportError(null);
     if (backup.kind === 'encrypted') setEncryptedBackup(backup.envelope);
-    else setPendingImport(backup.data);
+    else setPendingImport({ data: backup.data, files: backup.files });
   };
 
-  const applyImport = () => {
-    if (!pendingImport) return;
-    replaceData(pendingImport);
-    notify(
-      `Imported ${pluralize(pendingImport.records.length, 'record')} for ${pluralize(pendingImport.profiles.length, 'person', 'people')}`,
-    );
+  const cancelImport = () => {
+    importCancelled.current = true;
+    setImporting(false);
+    setPendingImport(null);
+  };
+
+  const applyImport = async () => {
+    if (!pendingImport || importing) return;
+    importCancelled.current = false;
+    const { data: imported, files } = pendingImport;
+    let ids = new Map<string, string>();
+    let next = imported;
+    if (files.length) {
+      setImporting(true);
+      try {
+        const restored = await restoreBackupFiles(fileStore(), files);
+        ids = restored.ids;
+        next = { ...imported, fileKey: restored.fileKey };
+      } catch {
+        if (mounted.current && !importCancelled.current) {
+          setImporting(false);
+          notify("The backup's files couldn't be saved. This browser's storage may be full. Nothing was changed.", 'error');
+        }
+        return;
+      }
+      // Cancelled, or the app locked, while files were being saved: leave the current data alone.
+      if (!mounted.current || importCancelled.current) {
+        void fileStore()
+          .remove(ids.values())
+          .catch(() => undefined);
+        return;
+      }
+      setImporting(false);
+    }
+    replaceData(relinkAttachments(next, ids));
+    notify(`Imported ${pluralize(imported.records.length, 'record')} for ${pluralize(imported.profiles.length, 'person', 'people')}`);
     setPendingImport(null);
   };
 
   return (
     <>
-      <PageHeader title="Settings" description="Your family, the lock, backups and how MedRecords looks." />
+      <PageHeader title="Settings" description="Family, reminders, privacy and backups." />
 
       <div className={styles.stack}>
         <FamilyCard />
 
+        <RemindersCard />
+
         <LockCard onExport={() => setExporting(true)} />
 
         <Card
-          title="Your data"
-          description={`Everything lives only in this browser${lockEnabled ? ', encrypted' : ''}. Nothing is uploaded.`}
+          title="Backups"
+          description={`Everything lives only in this browser${lockEnabled ? ', encrypted' : ''}. Back it up now and then.`}
           icon={<Database />}
         >
-          <dl className={styles.stats}>
-            <div>
-              <dt>People</dt>
-              <dd className="num">{data.profiles.length}</dd>
-            </div>
-            <div>
-              <dt>Records</dt>
-              <dd className="num">{data.records.length}</dd>
-            </div>
-            <div>
-              <dt>Lab results</dt>
-              <dd className="num">{data.labs.length}</dd>
-            </div>
-            <div>
-              <dt>Medications</dt>
-              <dd className="num">{data.medications.length}</dd>
-            </div>
-            <div>
-              <dt>Data size</dt>
-              <dd className="num">{sizeKb} KB</dd>
-            </div>
-          </dl>
-
           <div className={styles.actions}>
             <div className={styles.action}>
               <div>
@@ -193,7 +197,7 @@ export function SettingsPage() {
               <div>
                 <h3 className={styles.actionTitle}>Import a backup</h3>
                 <p className={styles.actionText} id={`${importId}-hint`}>
-                  Replace everything here with a MedRecords backup (plain or encrypted, up to 5 MB). It is checked first.
+                  Replace everything here with a MedRecords backup (plain or encrypted). It is checked first.
                 </p>
                 {importError && (
                   <p className={styles.error} role="alert" id={`${importId}-error`}>
@@ -248,64 +252,16 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <Card title="Appearance" description="Choose how MedRecords looks on this device." icon={<Palette />}>
-          <fieldset className={styles.themes}>
-            <legend className="visually-hidden">Theme</legend>
-            {THEMES.map((t) => {
-              const Icon = t.icon;
-              return (
-                <label key={t.value} className={styles.themeOption} data-theme-preview={t.value}>
-                  <input
-                    type="radio"
-                    name="theme"
-                    value={t.value}
-                    checked={preference === t.value}
-                    onChange={() => setPreference(t.value)}
-                    className={styles.themeInput}
-                  />
-                  <span className={styles.preview} aria-hidden="true">
-                    <span className={styles.previewSidebar} />
-                    <span className={styles.previewMain}>
-                      <span className={styles.previewLine} />
-                      <span className={styles.previewCard} />
-                      <span className={styles.previewCard} />
-                    </span>
-                  </span>
-                  <span className={styles.themeLabel}>
-                    <Icon size={16} aria-hidden="true" />
-                    {t.label}
-                  </span>
-                  <span className={styles.themeHint}>{t.hint}</span>
-                </label>
-              );
-            })}
-          </fieldset>
-        </Card>
-
-        <Card title="About & privacy" icon={<Info />}>
-          <div className={styles.about}>
-            <p>
-              MedRecords is a calm, private place to keep a family&apos;s health records. It is a personal project by Shishir
-              Garg.
-              {data.demo && (
-                <>
-                  {' '}
-                  Every person, clinician and facility in the demo is <strong>fictional</strong>.
-                </>
-              )}
-            </p>
-            <p>
-              Data is stored only in this browser. There is no server, no account, no analytics and no tracking. Clearing this
-              site&apos;s data in the browser deletes it, so export backups regularly.
-            </p>
-            <p>This is not a medical device and does not give medical advice.</p>
-            <a className={styles.link} href="https://github.com/gargshishirr/MedRecords" target="_blank" rel="noreferrer">
-              View source on GitHub <ExternalLink size={14} aria-hidden="true" />
-              <span className="visually-hidden"> (opens in a new tab)</span>
-            </a>
-          </div>
-        </Card>
+        <DeviceCard />
       </div>
+
+      <p className={styles.about}>
+        No server, no account, no tracking: MedRecords keeps everything in this browser. It is not a medical device.{' '}
+        <a className={styles.link} href="https://github.com/gargshishirr/MedRecords" target="_blank" rel="noreferrer">
+          Source on GitHub <ExternalLink size={13} aria-hidden="true" />
+          <span className="visually-hidden"> (opens in a new tab)</span>
+        </a>
+      </p>
 
       <Dialog
         open={exporting}
@@ -327,9 +283,9 @@ export function SettingsPage() {
           <BackupPasscodeForm
             envelope={encryptedBackup}
             onCancel={() => setEncryptedBackup(null)}
-            onOpened={(opened) => {
+            onOpened={(opened, files) => {
               setEncryptedBackup(null);
-              setPendingImport(opened);
+              setPendingImport({ data: opened, files });
             }}
           />
         )}
@@ -337,26 +293,27 @@ export function SettingsPage() {
 
       <Dialog
         open={pendingImport !== null}
-        onClose={() => setPendingImport(null)}
+        onClose={cancelImport}
         size="sm"
         title="Replace your data?"
         description="Everything in this browser now will be replaced by the backup."
         footer={
           <>
-            <Button variant="ghost" onClick={() => setPendingImport(null)}>
+            <Button variant="ghost" onClick={cancelImport}>
               Cancel
             </Button>
-            <Button variant="primary" icon={<Upload />} onClick={applyImport}>
-              Replace data
+            <Button variant="primary" icon={<Upload />} onClick={() => void applyImport()} disabled={importing} aria-busy={importing || undefined}>
+              {importing ? 'Importing…' : 'Replace data'}
             </Button>
           </>
         }
       >
         {pendingImport && (
           <p className={styles.confirmText}>
-            The backup has {pluralize(pendingImport.profiles.length, 'person', 'people')} and{' '}
-            {pluralize(pendingImport.records.length, 'record')}
-            {pendingImport.demo ? ' (demo data)' : ''}.{lockEnabled && ' It will stay encrypted with your current passcode.'}
+            The backup has {pluralize(pendingImport.data.profiles.length, 'person', 'people')} and{' '}
+            {pluralize(pendingImport.data.records.length, 'record')}
+            {pendingImport.files.length ? `, with ${pluralize(pendingImport.files.length, 'file')}` : ''}
+            {pendingImport.data.demo ? ' (demo data)' : ''}.{lockEnabled && ' It will stay encrypted with your current passcode.'}
           </p>
         )}
       </Dialog>

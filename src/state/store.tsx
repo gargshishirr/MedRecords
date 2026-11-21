@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AppData, Appointment, HealthRecord, LabResult, Medication, Profile } from '../lib/types';
+import type { AppData, Appointment, Attachment, HealthRecord, LabResult, Medication, Profile, ReminderSettings } from '../lib/types';
 import type {
   AppointmentInput,
   LabInput,
@@ -16,6 +16,7 @@ import { createSeedData } from '../lib/seed';
 import type { VaultKey } from '../lib/crypto';
 import { DecryptError, createVaultKey, cryptoAvailable, decryptText, encryptText, openEnvelope, sameSalt } from '../lib/crypto';
 import { parseAppDataJson } from '../lib/validate';
+import { MAX_ATTACHMENTS, collectGarbage, fileStore, newFileKey } from '../lib/files';
 import { clearThrottle, readThrottle, recordFailure, waitMs } from '../lib/throttle';
 import { useToast } from './toast';
 import { useIdleTimer } from './useIdleTimer';
@@ -81,6 +82,18 @@ interface StoreValue {
   toggleDose: (date: string, key: string, label: string) => void;
   markRefilled: (medicationId: string) => void;
   setAutoLockMinutes: (minutes: number) => void;
+  setReminders: (reminders: ReminderSettings) => void;
+  /** The key that encrypts attached files, created the first time it is needed. */
+  ensureFileKey: () => string;
+  /**
+   * Adds stored files to a record. Returns the ones that fit under the per-record limit,
+   * or null when the app has locked meanwhile (nothing is added then).
+   */
+  addAttachments: (recordId: string, files: Attachment[]) => Attachment[] | null;
+  /** Removes an attachment; its stored file is deleted once nothing points to it. */
+  removeAttachment: (recordId: string, index: number) => void;
+  /** Marks a scheduled vaccine as given for the active person (or clears it with `null`). */
+  setVaccine: (vaccineId: string, date: string | null) => void;
   /** Replaces everything with the demo family. */
   loadDemo: () => void;
   /** Replaces everything with an empty dataset. */
@@ -267,6 +280,27 @@ export function StoreProvider({
     return () => window.removeEventListener('storage', onStorage);
   }, [lockLocal, syncFromStorage]);
 
+  /* ---------- Attached files ---------- */
+
+  const fileIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (state.status !== 'ready') {
+      fileIds.current = null;
+      return;
+    }
+    const ids = ops.referencedFileIds(state.data);
+    const previous = fileIds.current;
+    fileIds.current = ids;
+    const files = fileStore();
+    if (!previous) {
+      // On opening, clear out files left behind (for example by a tab closed mid-upload).
+      void collectGarbage(files, ids).catch(() => undefined);
+      return;
+    }
+    const gone = [...previous].filter((id) => !ids.has(id));
+    if (gone.length) void files.remove(gone).catch(() => undefined);
+  }, [state]);
+
   /* ---------- Lock ---------- */
 
   const lockEnabled = state.status === 'ready' && state.vault !== null;
@@ -412,6 +446,9 @@ export function StoreProvider({
       /* ignore */
     }
     clearThrottle(storage);
+    void fileStore()
+      .clear()
+      .catch(() => undefined);
     saveSeq.current += 1;
     lastJson.current = null;
     clearAll();
@@ -461,6 +498,8 @@ export function StoreProvider({
   const data = state.status === 'ready' ? state.data : null;
   const profile = data ? (data.profiles.find((p) => p.id === data.activeProfileId) ?? data.profiles[0] ?? null) : null;
   const profileId = profile?.id ?? '';
+  /** A key made but not yet in state, so two quick uploads can't create two keys. */
+  const pendingFileKey = useRef<string | null>(null);
 
   const actions = useMemo(
     () => ({
@@ -506,9 +545,37 @@ export function StoreProvider({
         update((d) => ops.toggleDose(d, profileId, date, key, label, new Date())),
       markRefilled: (medicationId: string) => update((d) => ops.markRefilled(d, medicationId, new Date())),
       setAutoLockMinutes: (minutes: number) => update((d) => ops.setAutoLockMinutes(d, minutes)),
-      loadDemo: () => update((d) => ops.withSettings(createSeedData(new Date()), d)),
-      startFresh: () => update((d) => createEmptyData(new Date(), d.settings)),
-      replaceData: (next: AppData) => update((d) => ops.withSettings(next, d)),
+      setReminders: (reminders: ReminderSettings) => update((d) => ops.setReminders(d, reminders)),
+      ensureFileKey: () => {
+        const current = stateRef.current;
+        if (current.status === 'ready' && current.data.fileKey) return current.data.fileKey;
+        const key = (pendingFileKey.current ??= newFileKey());
+        update((d) => (d.fileKey ? d : { ...d, fileKey: key }));
+        return key;
+      },
+      addAttachments: (recordId: string, files: Attachment[]) => {
+        const current = stateRef.current;
+        if (current.status !== 'ready') return null;
+        const record = current.data.records.find((r) => r.id === recordId);
+        if (!record) return [];
+        const accepted = files.slice(0, Math.max(0, MAX_ATTACHMENTS - record.attachments.length));
+        if (accepted.length) update((d) => ops.addAttachments(d, recordId, accepted));
+        return accepted;
+      },
+      removeAttachment: (recordId: string, index: number) => update((d) => ops.removeAttachment(d, recordId, index)),
+      setVaccine: (vaccineId: string, date: string | null) => update((d) => ops.setVaccine(d, profileId, vaccineId, date)),
+      loadDemo: () => {
+        pendingFileKey.current = null;
+        update((d) => ops.withSettings(createSeedData(new Date()), d));
+      },
+      startFresh: () => {
+        pendingFileKey.current = null;
+        update((d) => createEmptyData(new Date(), d.settings));
+      },
+      replaceData: (next: AppData) => {
+        pendingFileKey.current = null;
+        update((d) => ops.withSettings(next, d));
+      },
     }),
     [update, profileId],
   );

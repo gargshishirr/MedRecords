@@ -12,6 +12,8 @@ import { LabsPage } from './pages/Labs/LabsPage';
 import { MedicationsPage } from './pages/Medications/MedicationsPage';
 import { EmergencyPage } from './pages/Emergency/EmergencyPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
+import { SummaryPage } from './pages/Summary/SummaryPage';
+import { VaccinesPage } from './pages/Vaccines/VaccinesPage';
 import { NotFoundPage } from './pages/NotFound/NotFoundPage';
 
 export function AppRoutes() {
@@ -23,6 +25,8 @@ export function AppRoutes() {
         <Route path="labs" element={<LabsPage />} />
         <Route path="medications" element={<MedicationsPage />} />
         <Route path="emergency" element={<EmergencyPage />} />
+        <Route path="summary" element={<SummaryPage />} />
+        <Route path="vaccines" element={<VaccinesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

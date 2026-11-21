@@ -10,14 +10,19 @@ Open it at **https://gargshishirr.github.io/MedRecords/**.
 ## Features
 
 - A profile for each family member.
-- Records: visits, lab reports, prescriptions, scans, vaccines and documents.
+- Records: visits, lab reports, prescriptions, scans, vaccines and documents, with photos or PDFs attached.
 - Lab trends with charts and reference ranges.
 - Medicines with a daily checklist and refill reminders.
 - Appointments and health readings (blood pressure, weight and more).
 - An emergency card with a QR code you can print.
+- A one-page doctor summary to print or save as a PDF.
+- A vaccine checklist for children.
+- Reminders, through your phone's calendar or notifications.
+- Warnings when a new medicine clashes with an allergy.
 - An optional passcode lock that encrypts everything.
 - Backups you can export and import.
 - Light and dark themes, a ⌘K / Ctrl+K search, and it works on phones.
+- Install it like an app. It works offline.
 
 ## How to use
 
@@ -42,6 +47,27 @@ Open it at **https://gargshishirr.github.io/MedRecords/**.
 - **Overview** has **Add reading** (vitals) and appointments (**Add**).
 - To change or delete something, open it and use **Edit** or **Delete**.
 
+### Photos and PDFs
+
+- Open a record, then **Add photo or PDF**. On a phone you can take a photo.
+- You can also attach files when you add a record.
+- Files are encrypted and stay on this device. Large photos are made smaller.
+- Tap a file to see it, open the PDF, download it or remove it.
+
+### Reminders
+
+- On a medicine or appointment, tap **Add to calendar** (the calendar icon). Open the file to add it to your phone's calendar. Your phone then reminds you.
+- **Settings → Reminders** can also notify you while MedRecords is open. Set your morning, afternoon and night times there.
+
+### Doctor summary and vaccines
+
+- **Overview → Doctor summary** shows one page for the doctor. Click **Print or save PDF**.
+- For a child, the Overview shows a **Vaccines** card. Open **Schedule** and tap a vaccine to mark it as given.
+
+### Install the app
+
+- **Settings → This device → Install**. On iPhone: Safari → Share → **Add to Home Screen**.
+
 ### The emergency card
 
 - Open **Emergency card**. Check the details, then click **Print card**.
@@ -57,7 +83,7 @@ Open it at **https://gargshishirr.github.io/MedRecords/**.
 
 ### Backups
 
-- **Settings → Export**. Pick **Encrypted** (needs a passcode) or **Plain JSON**.
+- **Settings → Export**. Pick **Encrypted** (needs a passcode) or **Plain JSON**. Attached files are included.
 - **Settings → Import** loads a backup and replaces what is there. It asks first.
 
 ## Keep it safe

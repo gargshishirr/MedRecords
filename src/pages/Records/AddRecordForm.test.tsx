@@ -69,7 +69,7 @@ describe('AddRecordForm', () => {
       facility: undefined,
       notes: undefined,
       cost: 1250,
-    });
+    }, []);
   });
 
   it('calls onCancel from the cancel button', async () => {

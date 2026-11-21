@@ -9,6 +9,7 @@ import type { RecordFormErrors, RecordFormValues } from '../../lib/recordForm';
 import { EMPTY_RECORD_FORM, NOTES_MAX, recordToForm, toRecordInput, validateRecordForm } from '../../lib/recordForm';
 import { Field, errorId, fieldProps, inputClass, textareaClass } from '../../components/ui/Field';
 import { FormActions } from '../../components/forms/FormBits';
+import { FilePicker } from '../../components/files/Attachments';
 import { RECORD_ICONS, typeColorStyle } from '../../components/RecordTypeIcon';
 import styles from './AddRecordForm.module.css';
 
@@ -17,7 +18,8 @@ const FIELD_ORDER: (keyof RecordFormValues)[] = ['type', 'title', 'date', 'cost'
 
 interface AddRecordFormProps {
   today: string;
-  onSubmit: (input: NewRecordInput) => void;
+  /** `files` are only offered when adding a new record. */
+  onSubmit: (input: NewRecordInput, files: File[]) => void;
   onCancel: () => void;
   /** Edit this record instead of adding a new one. */
   initial?: HealthRecord;
@@ -32,6 +34,7 @@ export function AddRecordForm({ today, onSubmit, onCancel, initial, onDelete, de
   );
   const [errors, setErrors] = useState<RecordFormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const uid = useId();
   const id = (name: string) => `${uid}-${name}`;
@@ -57,7 +60,7 @@ export function AddRecordForm({ today, onSubmit, onCancel, initial, onDelete, de
       target?.focus();
       return;
     }
-    onSubmit(toRecordInput(values));
+    onSubmit(toRecordInput(values), files);
   };
 
   const errorCount = Object.keys(errors).length;
@@ -184,6 +187,8 @@ export function AddRecordForm({ today, onSubmit, onCancel, initial, onDelete, de
           autoComplete="off"
         />
       </Field>
+
+      {!initial && <FilePicker files={files} onChange={setFiles} />}
 
       <FormActions
         submitLabel={initial ? 'Save changes' : 'Save record'}
