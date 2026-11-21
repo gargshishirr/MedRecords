@@ -300,16 +300,11 @@ export function EmergencyPage() {
           </footer>
         </article>
 
-        <aside className={`${styles.aside} no-print`} aria-labelledby="qr-contents">
-          <h2 id="qr-contents" className={styles.asideTitle}>
-            What the QR code contains
-          </h2>
-          <p className={styles.asideText}>
-            Plain text only — no link, no account and no server. Anyone who scans it sees exactly this:
-          </p>
-          <pre className={styles.pre}>{summary}</pre>
+        <aside className={`${styles.aside} no-print`} aria-labelledby="card-options">
           <fieldset className={styles.sections}>
-            <legend className={styles.sectionsTitle}>Show on the card and QR code</legend>
+            <legend id="card-options" className={styles.sectionsTitle}>
+              Show on the card and QR code
+            </legend>
             {CARD_SECTIONS.map((section) => (
               <label key={section} className={styles.sectionToggle}>
                 <input type="checkbox" checked={shows(section)} onChange={() => toggleSection(section)} />
@@ -318,11 +313,11 @@ export function EmergencyPage() {
             ))}
             <p className={styles.sectionsNote}>Name, blood group, allergies and emergency contacts are always shown.</p>
           </fieldset>
-          <ul className={styles.tips}>
-            <li>Keep a printed copy in your wallet or child's school bag.</li>
-            <li>Save it as your phone's lock-screen image for paramedics.</li>
-            <li>Re-print whenever medications change.</li>
-          </ul>
+          <details className={styles.qrDetails}>
+            <summary className={styles.asideTitle}>What the QR code contains</summary>
+            <p className={styles.asideText}>Plain text only — no link, no account, no server. Anyone who scans it sees this:</p>
+            <pre className={styles.pre}>{summary}</pre>
+          </details>
         </aside>
       </div>
     </>

@@ -2,6 +2,9 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Download,
+  FileHeart,
+  Syringe,
   ArrowRight,
   CornerDownLeft,
   FlaskConical,
@@ -25,6 +28,8 @@ import { RECORD_TYPE_META } from '../lib/recordMeta';
 import { latestLabs, medicationsFor, recordsFor } from '../lib/selectors';
 import { RECORD_ICONS, typeColorStyle } from './RecordTypeIcon';
 import { NAV_ITEMS, SETTINGS_ITEM } from './shell/nav';
+import { useInstall } from '../lib/pwa';
+import { hasSchedule } from '../lib/vaccines';
 import { Avatar } from './ui/Avatar';
 import { useProfileEditor } from './family/ProfileEditor';
 import styles from './CommandPalette.module.css';
@@ -58,6 +63,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const { lockEnabled, lockNow } = useVault();
   const { openNew: addPerson } = useProfileEditor();
   const { resolved, toggle } = useTheme();
+  const { canPrompt: canInstall, install } = useInstall();
   const { notify } = useToast();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -154,7 +160,36 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         };
       }),
     );
+    if (canInstall) {
+      list.push({
+        id: 'action-install',
+        group: 'Actions',
+        label: 'Install MedRecords as an app',
+        keywords: 'install app offline home screen pwa',
+        icon: <Download />,
+        run: () => void install(),
+      });
+    }
     if (!profile) return list;
+
+    list.push({
+      id: 'nav-summary',
+      group: 'Go to',
+      label: 'Doctor summary',
+      keywords: 'print pdf share doctor report one page',
+      icon: <FileHeart />,
+      run: go('/summary'),
+    });
+    if (hasSchedule(profile, now)) {
+      list.push({
+        id: 'nav-vaccines',
+        group: 'Go to',
+        label: 'Vaccine schedule',
+        keywords: 'vaccination immunisation immunization shots child',
+        icon: <Syringe />,
+        run: go('/vaccines'),
+      });
+    }
 
     const person = personContext(profile, now);
     for (const r of recordsFor(data, profile.id)) {
@@ -217,7 +252,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       });
     }
     return list;
-  }, [data, profile, now, resolved, toggle, navigate, setActiveProfile, notify, lockEnabled, lockNow, addPerson]);
+  }, [data, profile, now, resolved, toggle, navigate, setActiveProfile, notify, lockEnabled, lockNow, addPerson, canInstall, install]);
 
   const results = useMemo(() => {
     const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);

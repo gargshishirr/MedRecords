@@ -13,7 +13,8 @@ import type {
   VitalKind,
   VitalReading,
 } from './types';
-import { DEFAULT_AUTO_LOCK_MINUTES } from './types';
+import { DEFAULT_AUTO_LOCK_MINUTES, DEFAULT_REMINDERS } from './types';
+import { givenUpTo } from './vaccines';
 import { addDays, addMonths, daysBetween, parseISODate, startOfDay, toISODate } from './date';
 import { RECORD_TYPE_META } from './recordMeta';
 import { LAB_TESTS } from './ranges';
@@ -78,34 +79,7 @@ interface RecordSpec {
   summary?: string;
   notes?: string;
   cost?: number;
-  files?: string[];
   labs?: Partial<Record<LabTestId, number>>;
-}
-
-const slug = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 32);
-
-function defaultFiles(spec: RecordSpec, date: string): string[] {
-  const ym = date.slice(0, 7);
-  const base = slug(spec.title);
-  switch (spec.type) {
-    case 'lab':
-      return [`${base}-${ym}.pdf`];
-    case 'imaging':
-      return [`${base}-report.pdf`, `${base}-images.zip`];
-    case 'visit':
-      return [`consultation-notes-${ym}.pdf`];
-    case 'prescription':
-      return [`prescription-${ym}.jpg`];
-    case 'vaccination':
-      return [`vaccination-certificate-${ym}.pdf`];
-    case 'document':
-      return [`${base}.pdf`];
-  }
 }
 
 function formatLabSummary(labs: Partial<Record<LabTestId, number>>): string {
@@ -128,6 +102,7 @@ export function createSeedData(now: Date = new Date()): AppData {
   /* ---------------------------------------------------------------- */
   /* Profiles                                                          */
   /* ---------------------------------------------------------------- */
+  const kabirDob = yearsAgo(6, 97);
   const profiles: Profile[] = [
     {
       id: 'riya',
@@ -186,7 +161,7 @@ export function createSeedData(now: Date = new Date()): AppData {
       id: 'kabir',
       name: 'Kabir Kapoor',
       relation: 'Son',
-      dob: yearsAgo(6, 97),
+      dob: kabirDob,
       sex: 'Male',
       bloodGroup: 'O+',
       heightCm: 116,
@@ -203,6 +178,8 @@ export function createSeedData(now: Date = new Date()): AppData {
         facility: FACILITY.littleSteps,
         phone: '+91 00000 30003',
       },
+      // Up to date, matching the school-entry boosters in his records.
+      vaccines: givenUpTo(kabirDob, today),
     },
   ];
 
@@ -214,7 +191,7 @@ export function createSeedData(now: Date = new Date()): AppData {
       { m: 16, d: -4, type: 'visit', title: 'Fatigue & breathlessness consult', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'Tiredness for 2 months, pale conjunctiva. Ordered CBC, iron studies, vitamin D.', cost: 800 },
       { m: 16, d: -2, type: 'lab', title: 'CBC, iron studies & vitamin D', doctor: DOCTOR.rao, facility: FACILITY.sunrise, cost: 2150, labs: { hb: 10.6, vitd: 14, tsh: 2.4 }, notes: 'Serum ferritin 9 ng/mL (low).' },
       { m: 16, type: 'prescription', title: 'Iron & vitamin D course', doctor: DOCTOR.rao, facility: FACILITY.sanjeevani, summary: 'Ferrous ascorbate 100 mg daily · Cholecalciferol 60,000 IU weekly for 8 weeks.', cost: 640 },
-      { m: 14, d: 6, type: 'document', title: 'Employer health insurance e-card', facility: 'Suraksha Health Insurance (fictional)', summary: 'Family floater policy covering Riya, Arjun and Kabir. Valid for 12 months.', files: ['insurance-ecard.pdf'] },
+      { m: 14, d: 6, type: 'document', title: 'Employer health insurance e-card', facility: 'Suraksha Health Insurance (fictional)', summary: 'Family floater policy covering Riya, Arjun and Kabir. Valid for 12 months.' },
       { m: 13, d: 3, type: 'vaccination', title: 'Influenza vaccine (annual)', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'Quadrivalent influenza vaccine, left deltoid. No reaction.', cost: 1450 },
       { m: 12, d: -6, type: 'lab', title: 'CBC & vitamin D follow-up', doctor: DOCTOR.rao, facility: FACILITY.sunrise, cost: 1350, labs: { hb: 11.4, vitd: 22 } },
       { m: 12, d: -3, type: 'visit', title: 'Anaemia follow-up', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'Haemoglobin improving. Continue iron for 3 more months; switch to daily vitamin D3 + calcium.', cost: 800 },
@@ -223,10 +200,10 @@ export function createSeedData(now: Date = new Date()): AppData {
       { m: 9, d: -7, type: 'imaging', title: 'Pelvic ultrasound', doctor: DOCTOR.sen, facility: FACILITY.kaveri, summary: 'Normal study. No abnormality detected.', cost: 1900 },
       { m: 7, d: -2, type: 'lab', title: 'CBC & vitamin D review', doctor: DOCTOR.rao, facility: FACILITY.sunrise, cost: 1350, labs: { hb: 12.3, vitd: 31 } },
       { m: 6, d: 4, type: 'visit', title: 'Dental cleaning & check-up', doctor: DOCTOR.kulkarni, facility: FACILITY.pearl, summary: 'Scaling and polishing. One small cavity on lower left molar to watch.', cost: 1800 },
-      { m: 6, d: 4, type: 'imaging', title: 'Dental X-ray (OPG)', doctor: DOCTOR.kulkarni, facility: FACILITY.pearl, summary: 'Panoramic X-ray. Wisdom teeth erupted normally.', cost: 650, files: ['opg-xray.jpg'] },
+      { m: 6, d: 4, type: 'imaging', title: 'Dental X-ray (OPG)', doctor: DOCTOR.kulkarni, facility: FACILITY.pearl, summary: 'Panoramic X-ray. Wisdom teeth erupted normally.', cost: 650 },
       { m: 4, d: -8, type: 'visit', title: 'Eye examination', doctor: DOCTOR.bhat, facility: FACILITY.drishti, summary: 'Mild myopia, stable. Spectacle power −1.25 D both eyes.', cost: 700 },
       { m: 1, d: -6, type: 'lab', title: 'Annual health check', doctor: DOCTOR.rao, facility: FACILITY.sunrise, cost: 3200, labs: { hb: 12.6, vitd: 36, tsh: 2.1, fbs: 86, ldl: 92, hba1c: 5.2 } },
-      { m: 1, d: -4, type: 'document', title: 'Annual health check summary', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'All parameters within normal limits. Continue vitamin D3 + calcium.', files: ['health-check-summary.pdf'] },
+      { m: 1, d: -4, type: 'document', title: 'Annual health check summary', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'All parameters within normal limits. Continue vitamin D3 + calcium.' },
       { m: 1, d: -1, type: 'vaccination', title: 'Influenza vaccine (annual)', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'Quadrivalent influenza vaccine, left deltoid.', cost: 1450 },
       { m: 0, d: -21, type: 'visit', title: 'Seasonal allergy flare-up', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'Sneezing and congestion with the change in weather. Started cetirizine at night.', cost: 800 },
       { m: 0, d: -21, type: 'prescription', title: 'Cetirizine 10 mg', doctor: DOCTOR.rao, facility: FACILITY.sanjeevani, summary: 'Cetirizine 10 mg at bedtime for 30 days.', cost: 95 },
@@ -248,11 +225,11 @@ export function createSeedData(now: Date = new Date()): AppData {
       { m: 9, d: 6, type: 'vaccination', title: 'Pneumococcal vaccine (PCV)', doctor: DOCTOR.menon, facility: FACILITY.ashoka, summary: 'Recommended for adults with diabetes. Single dose.', cost: 2100 },
       { m: 8, d: -5, type: 'lab', title: 'Quarterly diabetes panel + vitamin D', doctor: DOCTOR.menon, facility: FACILITY.sunrise, cost: 2900, labs: { hba1c: 6.9, fbs: 129, ldl: 118, tsh: 3.4, vitd: 27 } },
       { m: 8, d: -2, type: 'visit', title: 'Diabetes review', doctor: DOCTOR.menon, facility: FACILITY.ashoka, summary: 'Good progress. Stopped glimepiride; continue metformin SR. Walk 30 min daily.', cost: 1200 },
-      { m: 6, d: 1, type: 'document', title: 'Health insurance renewal', facility: 'Suraksha Health Insurance (fictional)', summary: 'Senior citizen policy renewed. Pre-existing diabetes cover active.', files: ['policy-schedule.pdf', 'renewal-receipt.pdf'] },
+      { m: 6, d: 1, type: 'document', title: 'Health insurance renewal', facility: 'Suraksha Health Insurance (fictional)', summary: 'Senior citizen policy renewed. Pre-existing diabetes cover active.' },
       { m: 5, d: -6, type: 'lab', title: 'Quarterly diabetes panel', doctor: DOCTOR.menon, facility: FACILITY.sunrise, cost: 2450, labs: { hba1c: 7.0, fbs: 132, ldl: 104, tsh: 2.8, creatinine: 1.02 } },
       { m: 5, d: -3, type: 'visit', title: 'Diabetes review', doctor: DOCTOR.menon, facility: FACILITY.ashoka, summary: 'Stable. Festive-season dip in control discussed. No medication change.', cost: 1200 },
       { m: 3, d: 2, type: 'visit', title: 'Knee pain consult', doctor: DOCTOR.rao, facility: FACILITY.lotus, summary: 'Early osteoarthritis, right knee. Physiotherapy and weight loss advised.', cost: 800 },
-      { m: 3, d: 4, type: 'imaging', title: 'X-ray right knee', doctor: DOCTOR.sen, facility: FACILITY.kaveri, summary: 'Mild joint space narrowing, medial compartment.', cost: 750, files: ['knee-xray-report.pdf', 'knee-xray.jpg'] },
+      { m: 3, d: 4, type: 'imaging', title: 'X-ray right knee', doctor: DOCTOR.sen, facility: FACILITY.kaveri, summary: 'Mild joint space narrowing, medial compartment.', cost: 750 },
       { m: 2, d: -5, type: 'lab', title: 'Quarterly diabetes panel + vitamin D', doctor: DOCTOR.menon, facility: FACILITY.sunrise, cost: 3100, labs: { hba1c: 6.7, fbs: 121, ldl: 96, tsh: 2.6, vitd: 33, hb: 12.8, creatinine: 0.99 } },
       { m: 2, d: -2, type: 'visit', title: 'Diabetes review', doctor: DOCTOR.menon, facility: FACILITY.ashoka, summary: 'Best HbA1c in 18 months. LDL now at target. Continue current regimen.', cost: 1200 },
       { m: 2, d: -2, type: 'prescription', title: 'Repeat prescription — 3 months', doctor: DOCTOR.menon, facility: FACILITY.sanjeevani, summary: 'Metformin SR 500 mg · Levothyroxine 50 mcg · Atorvastatin 10 mg.', cost: 1180 },
@@ -267,7 +244,7 @@ export function createSeedData(now: Date = new Date()): AppData {
       { m: 9, d: -1, type: 'visit', title: 'Well-child check-up', doctor: DOCTOR.siddiqui, facility: FACILITY.littleSteps, summary: 'Looks a little pale. Ordered haemoglobin and vitamin D.', cost: 900 },
       { m: 9, d: 1, type: 'lab', title: 'Haemoglobin & vitamin D', doctor: DOCTOR.siddiqui, facility: FACILITY.sunrise, cost: 1100, labs: { hb: 11.2, vitd: 22 } },
       { m: 7, d: 5, type: 'visit', title: 'First dental visit', doctor: DOCTOR.kulkarni, facility: FACILITY.pearl, summary: 'No cavities. Fluoride varnish applied.', cost: 900 },
-      { m: 6, d: -4, type: 'document', title: 'School health form', doctor: DOCTOR.siddiqui, facility: FACILITY.littleSteps, summary: 'Signed fitness certificate and vaccination record for school admission.', files: ['school-health-form.pdf'] },
+      { m: 6, d: -4, type: 'document', title: 'School health form', doctor: DOCTOR.siddiqui, facility: FACILITY.littleSteps, summary: 'Signed fitness certificate and vaccination record for school admission.' },
       { m: 5, d: -2, type: 'visit', title: 'Ear pain & fever', doctor: DOCTOR.siddiqui, facility: FACILITY.littleSteps, summary: 'Acute otitis media, left ear. 7-day antibiotic course.', cost: 900 },
       { m: 5, d: -2, type: 'prescription', title: 'Azithromycin syrup', doctor: DOCTOR.siddiqui, facility: FACILITY.sanjeevani, summary: 'Azithromycin 200 mg/5 mL — 5 mL once daily for 3 days. Paracetamol as needed.', cost: 240 },
       { m: 3, d: -6, type: 'visit', title: 'Well-child check-up', doctor: DOCTOR.siddiqui, facility: FACILITY.littleSteps, summary: 'Height 116 cm, weight 20.4 kg. Eczema well controlled with moisturiser.', cost: 900 },
@@ -283,11 +260,8 @@ export function createSeedData(now: Date = new Date()): AppData {
     list.forEach((spec, i) => {
       const date = ago(spec.m, spec.d ?? 0);
       const id = `rec-${profileId}-${String(i + 1).padStart(2, '0')}`;
-      const files = spec.files ?? defaultFiles(spec, date);
-      const attachments: Attachment[] = files.map((name) => ({
-        name,
-        sizeKb: Math.round(120 + rand() * (name.endsWith('.zip') ? 9000 : 640)),
-      }));
+      // Demo records have no attached files: real files are stored encrypted, and the demo has none to store.
+      const attachments: Attachment[] = [];
       records.push({
         id,
         profileId,
@@ -476,6 +450,6 @@ export function createSeedData(now: Date = new Date()): AppData {
     appointments,
     doseLog,
     activity,
-    settings: { autoLockMinutes: DEFAULT_AUTO_LOCK_MINUTES },
+    settings: { autoLockMinutes: DEFAULT_AUTO_LOCK_MINUTES, reminders: { ...DEFAULT_REMINDERS, times: { ...DEFAULT_REMINDERS.times } } },
   };
 }

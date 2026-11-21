@@ -18,6 +18,7 @@ import { RECORD_ICONS, RecordTypeBadge, RecordTypeIcon, typeColorStyle } from '.
 import { selectClass } from '../../components/ui/Field';
 import { AddRecordForm } from './AddRecordForm';
 import { RecordDetail } from './RecordDetail';
+import { useAttachFiles } from '../../components/files/useFiles';
 import styles from './Records.module.css';
 
 type SortKey = 'newest' | 'oldest' | 'title';
@@ -44,6 +45,7 @@ function groupByMonth(records: HealthRecord[]) {
 
 export function RecordsPage() {
   const { data, profile, now, addRecord, updateRecord, deleteRecord } = useActiveProfile();
+  const attachFiles = useAttachFiles();
   const { notify } = useToast();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<RecordType | 'all'>('all');
@@ -106,8 +108,9 @@ export function RecordsPage() {
     return () => window.clearTimeout(t);
   }, [highlightId]);
 
-  const handleAdd = (input: NewRecordInput) => {
+  const handleAdd = (input: NewRecordInput, files: File[]) => {
     const record = addRecord(input);
+    if (files.length) void attachFiles(record.id, files);
     setAdding(false);
     setTypeFilter('all');
     setQuery('');

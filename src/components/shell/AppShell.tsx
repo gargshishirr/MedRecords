@@ -7,6 +7,7 @@ import { CommandPalette } from '../CommandPalette';
 import { ProfileEditorProvider } from '../family/ProfileEditor';
 import { NoProfiles } from '../family/NoProfiles';
 import { useStore } from '../../state/store';
+import { useReminders } from '../../state/useReminders';
 import styles from './AppShell.module.css';
 
 export function AppShell() {
@@ -15,6 +16,7 @@ export function AppShell() {
   const location = useLocation();
   const firstRender = useRef(true);
   const { data } = useStore();
+  useReminders();
   // Until someone is added, every page except Settings shows the "add your family" step.
   const needsProfile = data.profiles.length === 0 && location.pathname !== '/settings';
 

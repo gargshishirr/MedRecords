@@ -8,6 +8,7 @@ import type {
   Condition,
   Doctor,
   DoseLog,
+  DoseSlot,
   EmergencyContact,
   HealthRecord,
   ISODate,
@@ -24,6 +25,7 @@ import {
   CARD_SECTIONS,
   CONDITION_STATUSES,
   DEFAULT_AUTO_LOCK_MINUTES,
+  DEFAULT_REMINDERS,
   DOSE_SLOTS,
   LAB_TEST_IDS,
   MEDICATION_FORMS,
@@ -32,6 +34,8 @@ import {
   VITAL_KINDS,
 } from './types';
 import { isValidISODate } from './date';
+import { MAX_ATTACHMENTS, isFileKey, isFileType } from './files';
+import { VACCINE_IDS } from './vaccines';
 
 /**
  * Strict validation for stored data and imported backups.
@@ -59,7 +63,7 @@ const LIMITS = {
   activity: 400,
   perPersonList: 50,
   contacts: 10,
-  attachments: 20,
+  attachments: MAX_ATTACHMENTS,
   doseDays: 4_000,
   dosesPerDay: 60,
 };
@@ -160,13 +164,16 @@ class Reader {
     return typeof v === 'boolean' ? v : fallback;
   }
 
-  /** A list of objects. Missing gives an empty list. */
-  list<T>(key: string, noun: string, max: number, read: (item: Reader, where: string) => T): T[] {
-    const v = this.value(key);
+  /** A list of objects. Missing gives an empty list. With `trim`, extra entries are dropped instead of failing. */
+  list<T>(key: string, noun: string, max: number, read: (item: Reader, where: string) => T, trim = false): T[] {
+    let v = this.value(key);
     if (v === undefined || v === null) return [];
     if (!Array.isArray(v)) fail(`${this.where}: the ${noun} list is not valid.`);
-    if (v.length > max) fail(`${this.where}: too many ${noun} entries (max ${max}).`);
-    return v.map((item: unknown, i) => {
+    if (v.length > max) {
+      if (!trim) fail(`${this.where}: too many ${noun} entries (max ${max}).`);
+      v = v.slice(0, max);
+    }
+    return (v as unknown[]).map((item: unknown, i) => {
       const where = `${this.where}, ${noun} ${i + 1}`;
       if (!isObj(item)) fail(`${where} is not valid.`);
       return read(new Reader(item, where), where);
@@ -178,6 +185,18 @@ class Reader {
     const v = this.value(key);
     if (!Array.isArray(v)) return [];
     return options.filter((option) => v.includes(option));
+  }
+
+  /** An object of dates keyed by known ids. Unknown keys and bad dates are dropped. */
+  dateMap(key: string, allowed: readonly string[]): Record<string, ISODate> {
+    const v = this.value(key);
+    const out: Record<string, ISODate> = {};
+    if (!isObj(v)) return out;
+    for (const k of allowed) {
+      const d = has(v, k) ? v[k] : undefined;
+      if (isValidISODate(d)) out[k] = d;
+    }
+    return out;
   }
 
   object(key: string, label: string): Reader | undefined {
@@ -260,6 +279,8 @@ function readProfile(r: Reader): Profile {
   if (primaryDoctor) profile.primaryDoctor = primaryDoctor;
   const cardHidden = r.enumList('cardHidden', CARD_SECTIONS);
   if (cardHidden.length) profile.cardHidden = cardHidden;
+  const vaccines = r.dateMap('vaccines', VACCINE_IDS);
+  if (Object.keys(vaccines).length) profile.vaccines = vaccines;
   return profile;
 }
 
@@ -271,12 +292,25 @@ function belongsTo(profileIds: Set<string>) {
   };
 }
 
+const CLOCK_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const isClockTime = (v: unknown): v is string => typeof v === 'string' && CLOCK_RE.test(v);
+
 function readSettings(root: Obj): AppSettings {
   const settings = has(root, 'settings') && isObj(root.settings) ? root.settings : {};
   const minutes = has(settings, 'autoLockMinutes') ? settings.autoLockMinutes : undefined;
   const allowed: readonly number[] = AUTO_LOCK_MINUTES;
+  const reminders = has(settings, 'reminders') && isObj(settings.reminders) ? settings.reminders : {};
+  const times = has(reminders, 'times') && isObj(reminders.times) ? reminders.times : {};
+  const time = (slot: DoseSlot) => {
+    const t = has(times, slot) ? times[slot] : undefined;
+    return isClockTime(t) ? t : DEFAULT_REMINDERS.times[slot];
+  };
   return {
     autoLockMinutes: typeof minutes === 'number' && allowed.includes(minutes) ? minutes : DEFAULT_AUTO_LOCK_MINUTES,
+    reminders: {
+      enabled: has(reminders, 'enabled') && reminders.enabled === true,
+      times: { morning: time('morning'), afternoon: time('afternoon'), night: time('night') },
+    },
   };
 }
 
@@ -344,10 +378,20 @@ function readAppData(value: unknown, now: Date): AppData {
       type: r.oneOf('type', 'record type', RECORD_TYPES),
       title: r.text('title', 'title', 200, true),
       date,
-      attachments: r.list<Attachment>('attachments', 'attachment', LIMITS.attachments, (a) => ({
-        name: a.text('name', 'file name', 200, true),
-        sizeKb: a.num('sizeKb', 'file size', 0, 10_000_000),
-      })),
+      attachments: r.list<Attachment>('attachments', 'attachment', LIMITS.attachments, (a) => {
+        const attachment: Attachment = {
+          name: a.text('name', 'file name', 200, true),
+          sizeKb: a.num('sizeKb', 'file size', 0, 10_000_000),
+        };
+        const fileId = a.optText('fileId', 'file id', 100);
+        const type = a.optText('type', 'file type', 40);
+        // A stored file needs both a safe id and an allowed type; otherwise only the name is kept.
+        if (isSafeId(fileId) && isFileType(type)) {
+          attachment.fileId = fileId;
+          attachment.type = type;
+        }
+        return attachment;
+      }, true),
       createdAt: r.text('createdAt', 'added date', 40) || date,
     };
     const doctor = r.optText('doctor', 'doctor', 80);
@@ -463,6 +507,7 @@ function readAppData(value: unknown, now: Date): AppData {
     doseLog: readDoseLog(value, profileIds),
     activity,
     settings: readSettings(value),
+    ...(has(value, 'fileKey') && isFileKey(value.fileKey) ? { fileKey: value.fileKey } : {}),
   };
 }
 

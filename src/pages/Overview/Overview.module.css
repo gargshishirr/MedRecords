@@ -449,71 +449,6 @@
   color: var(--text-subtle);
 }
 
-/* ---------- Timeline ---------- */
-
-.timeline {
-  position: relative;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.timelineItem {
-  position: relative;
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  column-gap: var(--s-3);
-  padding-bottom: var(--s-3);
-}
-
-.timelineItem:last-child {
-  padding-bottom: 0;
-}
-
-.timelineItem::before {
-  content: '';
-  position: absolute;
-  left: 7px;
-  top: 16px;
-  bottom: -2px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--border-soft);
-}
-
-.timelineItem:last-child::before {
-  display: none;
-}
-
-.timelineDot {
-  grid-row: span 2;
-  width: 10px;
-  height: 10px;
-  margin: 5px 0 0 3px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 2px solid var(--primary);
-}
-
-.timelineItem[data-kind='dose'] .timelineDot {
-  border-color: var(--ok);
-}
-
-.timelineItem[data-kind='refill'] .timelineDot {
-  border-color: var(--watch);
-}
-
-.timelineText {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  line-height: 1.45;
-}
-
-.timelineTime {
-  font-size: var(--text-xs);
-  color: var(--text-subtle);
-}
-
 .footnote {
   display: flex;
   align-items: center;
@@ -592,6 +527,10 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
+}
+
+.apptButtons {
+  display: flex;
 }
 
 .readingList {

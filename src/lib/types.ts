@@ -63,6 +63,8 @@ export interface Profile {
   primaryDoctor?: Doctor;
   /** Sections hidden from the emergency card and its QR code. */
   cardHidden?: CardSection[];
+  /** Childhood vaccine schedule: vaccine id → date given. */
+  vaccines?: Record<string, ISODate>;
 }
 
 export const RECORD_TYPES = ['visit', 'lab', 'prescription', 'imaging', 'vaccination', 'document'] as const;
@@ -71,6 +73,10 @@ export type RecordType = (typeof RECORD_TYPES)[number];
 export interface Attachment {
   name: string;
   sizeKb: number;
+  /** Key of the stored (encrypted) file. Missing for older name-only attachments. */
+  fileId?: string;
+  /** MIME type of the stored file. */
+  type?: string;
 }
 
 export interface HealthRecord {
@@ -178,9 +184,24 @@ export type DoseLog = Record<string, Record<ISODate, string[]>>;
 export const AUTO_LOCK_MINUTES = [1, 2, 5, 10, 15, 30, 60] as const;
 export const DEFAULT_AUTO_LOCK_MINUTES = 5;
 
+/** 24-hour local time, e.g. `08:00`. */
+export type ClockTime = string;
+
+export interface ReminderSettings {
+  /** Show notifications for doses, appointments and refills while MedRecords is open. */
+  enabled: boolean;
+  times: Record<DoseSlot, ClockTime>;
+}
+
+export const DEFAULT_REMINDERS: ReminderSettings = {
+  enabled: false,
+  times: { morning: '08:00', afternoon: '14:00', night: '21:00' },
+};
+
 export interface AppSettings {
   /** Minutes of inactivity before the app locks (only used when a passcode is set). */
   autoLockMinutes: number;
+  reminders: ReminderSettings;
 }
 
 export interface AppData {
@@ -200,6 +221,11 @@ export interface AppData {
   doseLog: DoseLog;
   activity: ActivityItem[];
   settings: AppSettings;
+  /**
+   * AES-GCM key (base64) that encrypts attached files. It lives inside the data,
+   * so the passcode lock protects it too. Never exported in backups.
+   */
+  fileKey?: string;
 }
 
 export type RangeStatus = 'normal' | 'watch' | 'high' | 'low';

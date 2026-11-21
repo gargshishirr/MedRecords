@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
+  CalendarArrowDown,
   CalendarClock,
   Check,
   Droplet,
@@ -14,6 +14,7 @@ import {
   SprayCan,
   Syringe,
   Tablets,
+  TriangleAlert,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Medication } from '../../lib/types';
@@ -23,7 +24,6 @@ import { formatDate, parseISODate, toISODate, weekdayShort } from '../../lib/dat
 import { firstName, pluralize } from '../../lib/format';
 import { medicationsFor } from '../../lib/selectors';
 import { doseLogFor } from '../../lib/store';
-import type { NavIntent } from '../../lib/hooks';
 import { useNavIntent } from '../../lib/hooks';
 import { useActiveProfile } from '../../state/store';
 import { useToast } from '../../state/toast';
@@ -35,6 +35,9 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Ring } from '../../components/charts/Ring';
 import { TodayMeds, SLOT_ICONS } from '../Overview/TodayMeds';
 import { MedicationForm } from './MedicationForm';
+import { medicationWarnings } from '../../lib/safety';
+import { calendarFileName, medicationCalendar } from '../../lib/calendar';
+import { downloadText } from '../../lib/backup';
 import styles from './Medications.module.css';
 
 const FORM_ICONS: Record<Medication['form'], LucideIcon> = {
@@ -95,47 +98,26 @@ function AdherenceCard({ meds }: { meds: Medication[] }) {
   );
 }
 
-function RefillsCard({ meds }: { meds: Medication[] }) {
-  const { now } = useActiveProfile();
-  const rows = meds
-    .map((m) => ({ med: m, refill: refillStatus(m, now) }))
-    .sort((a, b) => a.refill.daysLeft - b.refill.daysLeft)
-    .slice(0, 4);
-  return (
-    <Card title="Refills" description="Days of supply left, soonest first" icon={<PillBottle />}>
-      {rows.length === 0 ? (
-        <p className={styles.none}>No active medications.</p>
-      ) : (
-        <ul role="list" className={styles.refills}>
-          {rows.map(({ med, refill }) => (
-            <li key={med.id}>
-              <Link
-                to="/medications"
-                state={{ med: med.id } satisfies NavIntent}
-                className={styles.refillRow}
-                data-level={refill.level}
-              >
-                <span className={styles.refillName}>
-                  {med.name} <span className={styles.strength}>{med.strength}</span>
-                </span>
-                <span className={styles.refillWhen}>{refill.label}</span>
-                <span className={styles.refillTrack} aria-hidden="true">
-                  <span style={{ width: `${refill.remaining * 100}%` }} />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
 function MedicationCard({ med, highlighted, onEdit }: { med: Medication; highlighted: boolean; onEdit: () => void }) {
-  const { now, markRefilled } = useActiveProfile();
+  const { data, profile, now, markRefilled } = useActiveProfile();
   const { notify } = useToast();
   const refill = refillStatus(med, now);
   const Icon = FORM_ICONS[med.form];
+  const warning = medicationWarnings(
+    med.name,
+    profile.allergies,
+    data.medications.filter((m) => m.profileId === profile.id),
+    now,
+    med.id,
+  ).find((w) => w.kind === 'allergy');
+  const addToCalendar = () => {
+    downloadText(
+      medicationCalendar(med, firstName(profile.name), data.settings.reminders.times, now),
+      calendarFileName(med.name),
+      'text/calendar',
+    );
+    notify('Calendar file downloaded. Open it to add daily reminders.');
+  };
 
   return (
     <article id={`med-${med.id}`} className={styles.med} data-highlight={highlighted || undefined} aria-labelledby={`med-title-${med.id}`}>
@@ -153,6 +135,13 @@ function MedicationCard({ med, highlighted, onEdit }: { med: Medication; highlig
           <Pencil />
         </IconButton>
       </header>
+
+      {warning && (
+        <p className={styles.medWarning}>
+          <TriangleAlert size={15} aria-hidden="true" />
+          {warning.message}
+        </p>
+      )}
 
       <ul role="list" className={styles.schedule} aria-label="Schedule">
         {DOSE_SLOTS.map((slot) => {
@@ -204,6 +193,11 @@ function MedicationCard({ med, highlighted, onEdit }: { med: Medication; highlig
             <span style={{ width: `${refill.remaining * 100}%` }} />
           </div>
         </div>
+        {med.schedule.length > 0 && (
+          <IconButton label={`Add ${med.name} reminders to calendar`} onClick={addToCalendar}>
+            <CalendarArrowDown />
+          </IconButton>
+        )}
         <Button
           size="sm"
           variant={refill.level === 'ok' ? 'ghost' : 'secondary'}
@@ -264,10 +258,7 @@ export function MedicationsPage() {
       />
 
       <div className={styles.top}>
-        <div className={styles.topCol}>
-          <AdherenceCard meds={[...active, ...past]} />
-          <RefillsCard meds={active} />
-        </div>
+        <AdherenceCard meds={[...active, ...past]} />
         <TodayMeds showLink={false} />
       </div>
 

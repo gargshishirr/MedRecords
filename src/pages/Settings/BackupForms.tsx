@@ -3,7 +3,11 @@ import type { FormEvent } from 'react';
 import { Download, FileLock2, FileJson, LockKeyhole } from 'lucide-react';
 import type { AppData } from '../../lib/types';
 import type { Envelope } from '../../lib/crypto';
-import { createBackup, decryptBackup, downloadText } from '../../lib/backup';
+import type { BackupFile } from '../../lib/files';
+import { collectBackupFiles, fileStore } from '../../lib/files';
+import { referencedFileIds } from '../../lib/store';
+import { pluralize } from '../../lib/format';
+import { MAX_BACKUP_BYTES, createBackup, decryptBackup, downloadText } from '../../lib/backup';
 import { toISODate } from '../../lib/date';
 import { validateNewPasscode } from '../../lib/forms';
 import type { FormErrors } from '../../lib/forms';
@@ -24,7 +28,9 @@ export function ExportForm({ onDone }: { onDone: () => void }) {
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [busy, setBusy] = useState(false);
+  const [tooBig, setTooBig] = useState<string | null>(null);
   const count = Object.keys(errors).length;
+  const fileCount = referencedFileIds(data).size;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,8 +42,19 @@ export function ExportForm({ onDone }: { onDone: () => void }) {
       if (first) return document.getElementById(first)?.focus();
     }
     setBusy(true);
+    setTooBig(null);
     try {
-      const text = await createBackup(data, kind === 'encrypted' ? passcode : undefined);
+      const files = await collectBackupFiles(fileStore(), data);
+      const text = await createBackup(data, kind === 'encrypted' ? passcode : undefined, files);
+      if (text.length > MAX_BACKUP_BYTES) {
+        const mb = Math.ceil(text.length / 1024 / 1024);
+        setTooBig(
+          `This backup would be ${mb} MB, too big to import again (the limit is ${MAX_BACKUP_BYTES / 1024 / 1024} MB). ${
+            kind === 'encrypted' ? 'Plain JSON is smaller, or remove some large files.' : 'Remove some large files first.'
+          }`,
+        );
+        return;
+      }
       const stamp = toISODate(now);
       downloadText(text, kind === 'encrypted' ? `medrecords-backup-${stamp}.encrypted.json` : `medrecords-backup-${stamp}.json`);
       notify(kind === 'encrypted' ? 'Encrypted backup downloaded' : 'Backup downloaded');
@@ -57,6 +74,7 @@ export function ExportForm({ onDone }: { onDone: () => void }) {
       aria-describedby={count ? `${uid}-sum` : undefined}
     >
       <ErrorSummary id={`${uid}-sum`} count={count} />
+      {fileCount > 0 && <p className={formStyles.help}>Includes {pluralize(fileCount, 'attached file')}.</p>}
       <fieldset className={formStyles.choice}>
         <legend className="visually-hidden">Backup type</legend>
         <label className={formStyles.choiceOption}>
@@ -114,6 +132,12 @@ export function ExportForm({ onDone }: { onDone: () => void }) {
         </Warning>
       )}
 
+      {tooBig && (
+        <div role="alert">
+          <Warning>{tooBig}</Warning>
+        </div>
+      )}
+
       <div className={formStyles.actions}>
         <Button variant="ghost" onClick={onDone}>
           Cancel
@@ -133,7 +157,7 @@ export function BackupPasscodeForm({
   onCancel,
 }: {
   envelope: Envelope;
-  onOpened: (data: AppData) => void;
+  onOpened: (data: AppData, files: BackupFile[]) => void;
   onCancel: () => void;
 }) {
   const uid = useId();
@@ -156,7 +180,7 @@ export function BackupPasscodeForm({
       setPasscode('');
       return document.getElementById(`${uid}-p`)?.focus();
     }
-    onOpened(result.data);
+    onOpened(result.data, result.files);
   };
 
   return (

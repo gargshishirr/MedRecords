@@ -28,7 +28,7 @@ export function LockCard({ onExport }: { onExport: () => void }) {
   return (
     <Card
       title="Lock with a passcode"
-      description="Encrypts everything in this browser. Optional, and off until you turn it on."
+      description="Optional. Encrypts everything in this browser, files included, and locks when you step away."
       icon={<LockKeyhole />}
     >
       {!canEncrypt ? (
@@ -74,11 +74,6 @@ export function LockCard({ onExport }: { onExport: () => void }) {
         </div>
       ) : (
         <div className={styles.lockOn}>
-          <ul className={styles.lockPoints}>
-            <li>Data is encrypted on this device with a key made from your passcode.</li>
-            <li>The app locks itself after a few minutes without activity.</li>
-            <li>Best for shared or family devices.</li>
-          </ul>
           <Warning>
             <strong>If you forget the passcode, your data cannot be recovered.</strong> Export a backup first and keep it
             somewhere safe.

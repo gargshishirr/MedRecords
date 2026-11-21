@@ -13,7 +13,9 @@ import {
 } from '../../lib/forms';
 import type { MedicationInput } from '../../lib/store';
 import { Field, fieldProps, inputClass, selectClass, textareaClass } from '../../components/ui/Field';
-import { ErrorSummary, FormActions, formStyles, useFormState } from '../../components/forms/FormBits';
+import { ErrorSummary, FormActions, Warning, formStyles, useFormState } from '../../components/forms/FormBits';
+import { medicationWarnings } from '../../lib/safety';
+import { useActiveProfile } from '../../state/store';
 
 const FORM_LABEL: Record<MedForm, string> = {
   tablet: 'Tablet',
@@ -51,6 +53,14 @@ export function MedicationForm({
   const uid = useId();
   const id = (name: string) => `${uid}-${name}`;
   const errorCount = Object.keys(errors).length;
+  const { data, profile, now } = useActiveProfile();
+  const warnings = medicationWarnings(
+    values.name,
+    profile.allergies,
+    data.medications.filter((m) => m.profileId === profile.id),
+    now,
+    initial?.id,
+  );
 
   const text = (
     key: TextKey,
@@ -109,6 +119,16 @@ export function MedicationForm({
         {text('name', 'Medicine', { required: true, placeholder: 'e.g. Metformin' })}
         {text('strength', 'Strength', { placeholder: 'e.g. 500 mg' })}
       </div>
+
+      {warnings.length > 0 && (
+        <div role="status">
+          <Warning>
+            {warnings.map((w) => (
+              <p key={w.message}>{w.message}</p>
+            ))}
+          </Warning>
+        </div>
+      )}
 
       <div className={formStyles.row3}>
         <Field id={id('form')} label="Form" error={errors.form}>

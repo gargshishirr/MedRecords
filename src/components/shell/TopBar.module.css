@@ -98,8 +98,7 @@
     display: inline-grid;
   }
 
-  .search,
-  .newRecord {
+  .search {
     display: none;
   }
 

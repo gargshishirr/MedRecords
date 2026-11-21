@@ -3,6 +3,7 @@ import type {
   AppData,
   AppSettings,
   Appointment,
+  Attachment,
   HealthRecord,
   ISODate,
   LabResult,
@@ -10,11 +11,13 @@ import type {
   Medication,
   Profile,
   RecordType,
+  ReminderSettings,
   VitalReading,
 } from './types';
-import { DEFAULT_AUTO_LOCK_MINUTES } from './types';
+import { DEFAULT_AUTO_LOCK_MINUTES, DEFAULT_REMINDERS } from './types';
 import type { Envelope } from './crypto';
 import { parseEnvelope } from './crypto';
+import { MAX_ATTACHMENTS } from './files';
 import { toISODate, toLocalISO } from './date';
 import { RECORD_TYPE_META } from './recordMeta';
 import { LAB_TESTS } from './ranges';
@@ -37,7 +40,7 @@ export function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${rand}`;
 }
 
-export const DEFAULT_SETTINGS: AppSettings = { autoLockMinutes: DEFAULT_AUTO_LOCK_MINUTES };
+export const DEFAULT_SETTINGS: AppSettings = { autoLockMinutes: DEFAULT_AUTO_LOCK_MINUTES, reminders: DEFAULT_REMINDERS };
 
 /** An empty dataset for someone starting fresh: no people yet. */
 export function createEmptyData(now: Date = new Date(), settings: AppSettings = DEFAULT_SETTINGS): AppData {
@@ -54,7 +57,7 @@ export function createEmptyData(now: Date = new Date(), settings: AppSettings = 
     appointments: [],
     doseLog: {},
     activity: [],
-    settings: { ...settings },
+    settings: { ...settings, reminders: { ...settings.reminders, times: { ...settings.reminders.times } } },
   };
 }
 
@@ -109,6 +112,56 @@ export function withSettings(next: AppData, current: AppData): AppData {
 
 export function setAutoLockMinutes(data: AppData, minutes: number): AppData {
   return { ...data, settings: { ...data.settings, autoLockMinutes: minutes } };
+}
+
+export function setReminders(data: AppData, reminders: ReminderSettings): AppData {
+  return { ...data, settings: { ...data.settings, reminders: { enabled: reminders.enabled, times: { ...reminders.times } } } };
+}
+
+/* ---------- Attached files ---------- */
+
+/** Adds file metadata to a record (the encrypted bytes are stored separately), up to the per-record limit. */
+export function addAttachments(data: AppData, recordId: string, files: Attachment[]): AppData {
+  return {
+    ...data,
+    records: data.records.map((r) =>
+      r.id === recordId ? { ...r, attachments: [...r.attachments, ...files].slice(0, MAX_ATTACHMENTS) } : r,
+    ),
+  };
+}
+
+/** Removes one attachment from a record, by its stored-file id or (for older name-only files) its index. */
+export function removeAttachment(data: AppData, recordId: string, index: number): AppData {
+  return {
+    ...data,
+    records: data.records.map((r) =>
+      r.id === recordId ? { ...r, attachments: r.attachments.filter((_, i) => i !== index) } : r,
+    ),
+  };
+}
+
+/** Every stored-file id the data still points to. */
+export function referencedFileIds(data: AppData): Set<string> {
+  const ids = new Set<string>();
+  for (const r of data.records) for (const a of r.attachments) if (a.fileId) ids.add(a.fileId);
+  return ids;
+}
+
+/* ---------- Vaccine schedule ---------- */
+
+/** Marks a scheduled vaccine as given on `date`, or clears it when `date` is null. */
+export function setVaccine(data: AppData, profileId: string, vaccineId: string, date: ISODate | null): AppData {
+  return {
+    ...data,
+    profiles: data.profiles.map((p) => {
+      if (p.id !== profileId) return p;
+      const { vaccines: current, ...rest } = p;
+      const vaccines = { ...(current ?? {}) };
+      if (date) vaccines[vaccineId] = date;
+      else delete vaccines[vaccineId];
+      return Object.keys(vaccines).length ? { ...rest, vaccines } : rest;
+    }),
+  };
 }
 
 /** Reads one person's medication checklist without touching inherited properties. */
